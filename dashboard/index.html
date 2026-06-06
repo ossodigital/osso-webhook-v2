@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>OSSO DASHBOARD CRM</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      background: #0f0f0f;
+      color: #fff;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      height: 70px;
+      padding: 18px 24px;
+      border-bottom: 1px solid #222;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #101010;
+      flex-shrink: 0;
+    }
+
+    h1 {
+      color: #00ff88;
+      font-size: 24px;
+      margin: 0;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status {
+      color: #aaa;
+      font-size: 14px;
+    }
+
+    .logout-btn {
+      background: #1f1f1f;
+      border: 1px solid #333;
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .logout-btn:hover {
+      background: #2a2a2a;
+    }
+
+    .login-screen {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 420px;
+      background: #161616;
+      border: 1px solid #2b2b2b;
+      border-radius: 18px;
+      padding: 26px;
+      box-shadow: 0 20px 50px rgba(0,0,0,.45);
+    }
+
+    .login-card h2 {
+      margin-top: 0;
+      color: #00ff88;
+      margin-bottom: 10px;
+    }
+
+    .login-card p {
+      color: #aaa;
+      line-height: 1.4;
+      margin-bottom: 18px;
+    }
+
+    .login-card input {
+      width: 100%;
+      padding: 14px;
+      background: #111;
+      color: #fff;
+      border: 1px solid #333;
+      border-radius: 12px;
+      margin-bottom: 14px;
+      outline: none;
+      font-size: 15px;
+    }
+
+    .login-card button {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: #00ff88;
+      color: #000;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    .layout {
+      display: none;
+      grid-template-columns: 360px 1fr;
+      height: calc(100vh - 70px);
+      overflow: hidden;
+    }
+
+    .sidebar {
+      border-right: 1px solid #222;
+      background: #0b0b0b;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 15px;
+    }
+
+    .chat-area {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+      background: #111;
+    }
+
+    .chat-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #222;
+      background: #151515;
+      flex-shrink: 0;
+    }
+
+    .chat-title {
+      font-size: 22px;
+      font-weight: bold;
+      color: #00ff88;
+      margin-bottom: 6px;
+    }
+
+    .chat-subtitle {
+      color: #aaa;
+      font-size: 14px;
+    }
+
+    .manual-note {
+      display: none;
+      padding: 12px 20px;
+      background: #2a0909;
+      color: #ff9d9d;
+      border-top: 1px solid #4d1414;
+      border-bottom: 1px solid #4d1414;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      scroll-behavior: smooth;
+    }
+
+    .chat-messages::-webkit-scrollbar,
+    .sidebar::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .chat-messages::-webkit-scrollbar-thumb,
+    .sidebar::-webkit-scrollbar-thumb {
+      background: #00ff88;
+      border-radius: 10px;
+    }
+
+    .chat-messages::-webkit-scrollbar-track,
+    .sidebar::-webkit-scrollbar-track {
+      background: #111;
+    }
+
+    .chat-input-area {
+      border-top: 1px solid #222;
+      padding: 14px;
+      background: #101010;
+      display: grid;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .chat-input-area textarea {
+      width: 100%;
+      height: 80px;
+      resize: none;
+      border: 1px solid #333;
+      border-radius: 12px;
+      background: #1a1a1a;
+      color: #fff;
+      padding: 14px;
+      font-size: 15px;
+      outline: none;
+    }
+
+    .chat-buttons {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr 1fr;
+      gap: 10px;
+    }
+
+    .chat-buttons button {
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: .2s;
+    }
+
+    .chat-buttons button:hover {
+      opacity: .88;
+    }
+
+    .btn-send {
+      background: #00ff88;
+      color: #000;
+    }
+
+    .btn-human {
+      background: #ff3b3b;
+      color: #fff;
+    }
+
+    .btn-ai {
+      background: #00bfff;
+      color: #000;
+    }
+
+    .filters {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 12px;
+      background: #1b1b1b;
+      color: #fff;
+      border: 1px solid #333;
+      border-radius: 10px;
+      outline: none;
+    }
+
+    .lead-card {
+      background: #1a1a1a;
+      padding: 14px;
+      margin-bottom: 10px;
+      border-radius: 12px;
+      border-left: 4px solid #00ff88;
+      cursor: pointer;
+      transition: .15s;
+    }
+
+    .lead-card:hover {
+      background: #222;
+      transform: translateY(-1px);
+    }
+
+    .lead-card.active {
+      outline: 2px solid #00ff88;
+      background: #17241d;
+    }
+
+    .lead-card.humano {
+      border-left-color: #ff3b3b;
+      background: #241414;
+    }
+
+    .lead-card.quente {
+      border-left-color: #ffb000;
+    }
+
+    .lead-card.agendamento {
+      border-left-color: #00bfff;
+    }
+
+    .lead-card.orcamento {
+      border-left-color: #b366ff;
+    }
+
+    .lead-phone {
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+
+    .lead-name {
+      color: #ddd;
+      margin-bottom: 6px;
+    }
+
+    .lead-stage {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #333;
+      font-size: 12px;
+      margin-bottom: 7px;
+    }
+
+    .lead-stage.humano {
+      background: #5a1111;
+      color: #ff8888;
+    }
+
+    .lead-stage.quente {
+      background: #4a3200;
+      color: #ffd36b;
+    }
+
+    .lead-stage.agendamento {
+      background: #00384a;
+      color: #77dfff;
+    }
+
+    .lead-stage.orcamento {
+      background: #35164d;
+      color: #d8a4ff;
+    }
+
+    .lead-message {
+      color: #aaa;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .bubble {
+      max-width: 70%;
+      padding: 14px;
+      border-radius: 14px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      box-shadow: 0 4px 14px rgba(0,0,0,.25);
+    }
+
+    .bubble.user {
+      align-self: flex-end;
+      background: #075e54;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .bubble.assistant {
+      align-self: flex-start;
+      background: #1f1f1f;
+      color: #00ff88;
+      border-bottom-left-radius: 4px;
+    }
+
+    .bubble-meta {
+      font-size: 11px;
+      opacity: .65;
+      margin-bottom: 5px;
+    }
+
+    .top-metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .metric {
+      background: #171717;
+      padding: 10px;
+      border-radius: 10px;
+      text-align: center;
+      border: 1px solid #222;
+    }
+
+    .metric strong {
+      display: block;
+      color: #00ff88;
+      font-size: 20px;
+    }
+
+    .metric span {
+      color: #aaa;
+      font-size: 11px;
+    }
+
+    .empty {
+      color: #777;
+      text-align: center;
+      margin-top: 80px;
+      font-size: 18px;
+    }
+
+    @media (max-width: 900px) {
+
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        height: 40vh;
+        border-right: 0;
+        border-bottom: 1px solid #222;
+      }
+
+      .chat-area {
+        height: 60vh;
+      }
+
+      .chat-buttons {
+        grid-template-columns: 1fr;
+      }
+
+      .bubble {
+        max-width: 92%;
+      }
+
+      h1 {
+        font-size: 18px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>🔥 OSSO DASHBOARD CRM</h1>
+
+  <div class="header-right">
+    <div id="status" class="status"></div>
+
+    <button
+      id="logoutBtn"
+      class="logout-btn"
+      onclick="logout()"
+      style="display:none;"
+    >
+      Sair
+    </button>
+  </div>
+</header>
+
+<div id="loginScreen" class="login-screen">
+
+  <div class="login-card">
+
+    <h2>🔐 Acesso OSSO CRM</h2>
+
+    <p>
+      Digite a senha do painel para entrar.
+      Ela ficará salva neste navegador.
+    </p>
+
+    <input
+      id="loginToken"
+      type="password"
+      placeholder="Senha do dashboard"
+    >
+
+    <button onclick="login()">
+      Entrar no painel
+    </button>
+
+  </div>
+
+</div>
+
+<div id="app" class="layout">
+
+  <aside class="sidebar">
+
+    <div class="top-metrics">
+
+      <div class="metric">
+        <strong id="mTotal">0</strong>
+        <span>Total</span>
+      </div>
+
+      <div class="metric">
+        <strong id="mHumano">0</strong>
+        <span>Humano</span>
+      </div>
+
+      <div class="metric">
+        <strong id="mQuente">0</strong>
+        <span>Quente</span>
+      </div>
+
+      <div class="metric">
+        <strong id="mAgenda">0</strong>
+        <span>Agenda</span>
+      </div>
+
+    </div>
+
+    <div class="filters">
+
+      <input
+        id="busca"
+        type="text"
+        placeholder="Buscar nome, telefone ou mensagem..."
+      >
+
+      <select id="filtroStage">
+        <option value="">Todos os stages</option>
+        <option value="humano">Humano</option>
+        <option value="quente">Quente</option>
+        <option value="agendamento">Agendamento</option>
+        <option value="orcamento">Orçamento</option>
+        <option value="novo">Novo</option>
+        <option value="captando_nome">Captando nome</option>
+        <option value="encerrado">Encerrado</option>
+        <option value="followup_1">Followup 1</option>
+        <option value="followup_2">Followup 2</option>
+        <option value="curioso">Curioso</option>
+      </select>
+
+    </div>
+
+    <div id="leads"></div>
+
+  </aside>
+
+  <main class="chat-area">
+
+    <div class="chat-header">
+
+      <div id="chatTitle" class="chat-title">
+        Selecione um lead
+      </div>
+
+      <div id="chatSubtitle" class="chat-subtitle">
+        Clique em um contato para acompanhar a conversa completa.
+      </div>
+
+    </div>
+
+    <div id="manualNote" class="manual-note">
+      🚨 ATENDIMENTO HUMANO ATIVO — IA BLOQUEADA PARA ESTE LEAD
+    </div>
+
+    <div id="chatMessages" class="chat-messages">
+
+      <div class="empty">
+        Nenhum lead selecionado.
+      </div>
+
+    </div>
+
+    <div class="chat-input-area">
+
+      <textarea
+        id="msgInput"
+        placeholder="Digite uma mensagem manual para o lead..."
+      ></textarea>
+
+      <div class="chat-buttons">
+
+        <button
+          id="btnSend"
+          class="btn-send"
+          onclick="enviarMensagemManual()"
+        >
+          📤 Enviar mensagem
+        </button>
+
+        <button
+          id="btnHuman"
+          class="btn-human"
+          onclick="ativarHumano()"
+        >
+          🔴 Takeover
+        </button>
+
+        <button
+          id="btnAI"
+          class="btn-ai"
+          onclick="voltarIA()"
+        >
+          🤖 Voltar IA
+        </button>
+
+      </div>
+
+    </div>
+
+  </main>
+
+</div>
+
+<script>
+
+const API =
+  "https://osso-webhookosso-webhook-2.vercel.app/api/meta";
+
+let TOKEN =
+  localStorage.getItem("osso_dashboard_token") || "";
+
+const statusBox =
+  document.getElementById("status");
+
+const app =
+  document.getElementById("app");
+
+const loginScreen =
+  document.getElementById("loginScreen");
+
+const loginToken =
+  document.getElementById("loginToken");
+
+const logoutBtn =
+  document.getElementById("logoutBtn");
+
+const leadsBox =
+  document.getElementById("leads");
+
+const chatTitle =
+  document.getElementById("chatTitle");
+
+const chatSubtitle =
+  document.getElementById("chatSubtitle");
+
+const chatMessages =
+  document.getElementById("chatMessages");
+
+const manualNote =
+  document.getElementById("manualNote");
+
+const busca =
+  document.getElementById("busca");
+
+const filtroStage =
+  document.getElementById("filtroStage");
+
+const msgInput =
+  document.getElementById("msgInput");
+
+const btnSend =
+  document.getElementById("btnSend");
+
+const btnHuman =
+  document.getElementById("btnHuman");
+
+const btnAI =
+  document.getElementById("btnAI");
+
+let leadsCache = [];
+let selectedPhone = null;
+let lastMessageCount = 0;
+let intervalo = null;
+
+function mostrarLogin() {
+
+  app.style.display = "none";
+
+  loginScreen.style.display = "flex";
+
+  logoutBtn.style.display = "none";
+
+  statusBox.innerHTML = "";
+}
+
+function mostrarApp() {
+
+  loginScreen.style.display = "none";
+
+  app.style.display = "grid";
+
+  logoutBtn.style.display = "inline-block";
+}
+
+async function login() {
+
+  const senha =
+    loginToken.value.trim();
+
+  if (!senha) {
+
+    alert("Digite a senha.");
+
+    return;
+  }
+
+  TOKEN = senha;
+
+  try {
+
+    const res = await fetch(
+      API + "?debug=ping&token=" + encodeURIComponent(TOKEN)
+    );
+
+    const data =
+      await res.json();
+
+    if (!res.ok || !data.ok) {
+
+      alert("Senha inválida.");
+
+      return;
+    }
+
+    localStorage.setItem(
+      "osso_dashboard_token",
+      TOKEN
+    );
+
+    mostrarApp();
+
+    iniciarDashboard();
+
+  } catch (err) {
+
+    console.error(err);
+
+    alert("Erro ao conectar.");
+  }
+}
+
+function logout() {
+
+  localStorage.removeItem(
+    "osso_dashboard_token"
+  );
+
+  TOKEN = "";
+
+  selectedPhone = null;
+
+  if (intervalo) {
+
+    clearInterval(intervalo);
+
+    intervalo = null;
+  }
+
+  mostrarLogin();
+}
+
+loginToken.addEventListener(
+  "keydown",
+  function(event) {
+
+    if (event.key === "Enter") {
+      login();
+    }
+  }
+);
+
+function escaparHTML(valor) {
+
+  return String(valor || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function formatarData(data) {
+
+  if (!data) return "";
+
+  try {
+
+    return new Date(data)
+      .toLocaleString("pt-BR");
+
+  } catch {
+
+    return "";
+  }
+}
+
+function atualizarMetricas(leads) {
+
+  document.getElementById("mTotal").textContent =
+    leads.length;
+
+  document.getElementById("mHumano").textContent =
+    leads.filter(
+      l => l.stage === "humano"
+    ).length;
+
+  document.getElementById("mQuente").textContent =
+    leads.filter(
+      l => l.stage === "quente"
+    ).length;
+
+  document.getElementById("mAgenda").textContent =
+    leads.filter(
+      l => l.stage === "agendamento"
+    ).length;
+}
+
+function filtrarLeads() {
+
+  const termo =
+    busca.value.toLowerCase().trim();
+
+  const stage =
+    filtroStage.value;
+
+  return leadsCache.filter(lead => {
+
+    const texto =
+      `${lead.phone || ""} ${lead.name || ""} ${lead.last_message || ""}`
+      .toLowerCase();
+
+    const matchBusca =
+      !termo || texto.includes(termo);
+
+    const matchStage =
+      !stage || lead.stage === stage;
+
+    return matchBusca && matchStage;
+  });
+}
+
+function renderLeads() {
+
+  const leads =
+    filtrarLeads();
+
+  leadsBox.innerHTML = "";
+
+  leads.forEach(lead => {
+
+    const ativo =
+      selectedPhone === lead.phone
+        ? "active"
+        : "";
+
+    const stage =
+      lead.stage || "novo";
+
+    leadsBox.innerHTML += `
+      <div
+        class="lead-card ${escaparHTML(stage)} ${ativo}"
+        onclick="selecionarLead('${escaparHTML(lead.phone)}')"
+      >
+
+        <div class="lead-phone">
+          📱 ${escaparHTML(lead.phone)}
+        </div>
+
+        <div class="lead-name">
+          👤 ${escaparHTML(lead.name || "Sem nome")}
+        </div>
+
+        <div class="lead-stage ${escaparHTML(stage)}">
+          🎯 ${escaparHTML(stage)}
+        </div>
+
+        <div class="lead-message">
+          💬 ${escaparHTML(lead.last_message || "")}
+        </div>
+
+      </div>
+    `;
+  });
+}
+
+async function carregarLeads() {
+
+  const res = await fetch(
+    API + "?debug=leads&token=" + encodeURIComponent(TOKEN)
+  );
+
+  const data =
+    await res.json();
+
+  if (!res.ok || !data.ok) {
+
+    statusBox.innerHTML =
+      "🔒 Token inválido";
+
+    localStorage.removeItem(
+      "osso_dashboard_token"
+    );
+
+    TOKEN = "";
+
+    mostrarLogin();
+
+    return;
+  }
+
+  mostrarApp();
+
+  leadsCache =
+    data.data || [];
+
+  atualizarMetricas(leadsCache);
+
+  renderLeads();
+
+  statusBox.innerHTML =
+    "✅ Dashboard conectado e protegido";
+
+  if (selectedPhone) {
+
+    const leadAtual =
+      leadsCache.find(
+        l => l.phone === selectedPhone
+      );
+
+    if (leadAtual) {
+      atualizarHeaderLead(leadAtual);
+    }
+  }
+}
+
+function atualizarHeaderLead(lead) {
+
+  chatTitle.innerHTML =
+    `${escaparHTML(lead.name || "Sem nome")} — ${escaparHTML(lead.phone)}`;
+
+  chatSubtitle.innerHTML =
+    `Stage: ${escaparHTML(lead.stage || "novo")} • Última mensagem: ${escaparHTML(lead.last_message || "")}`;
+
+  manualNote.style.display =
+    lead.stage === "humano"
+      ? "block"
+      : "none";
+}
+
+async function selecionarLead(phone) {
+
+  selectedPhone = phone;
+
+  lastMessageCount = 0;
+
+  const lead =
+    leadsCache.find(
+      l => l.phone === phone
+    );
+
+  if (lead) {
+    atualizarHeaderLead(lead);
+  }
+
+  renderLeads();
+
+  await carregarConversa(phone, true);
+}
+
+async function carregarConversa(phone, forceScroll = false) {
+
+  const url =
+    API
+    + "?debug=messages-by-phone"
+    + "&phone=" + encodeURIComponent(phone)
+    + "&token=" + encodeURIComponent(TOKEN);
+
+  const res =
+    await fetch(url);
+
+  const data =
+    await res.json();
+
+  if (!res.ok || !data.ok) {
+
+    chatMessages.innerHTML =
+      `<div class="erro">Erro ao carregar conversa.</div>`;
+
+    return;
+  }
+
+  const mensagens =
+    data.data || [];
+
+  if (!mensagens.length) {
+
+    chatMessages.innerHTML =
+      `<div class="empty">Sem mensagens para este lead.</div>`;
+
+    lastMessageCount = 0;
+
+    return;
+  }
+
+  const deveScrollar =
+    forceScroll ||
+    mensagens.length !== lastMessageCount;
+
+  lastMessageCount =
+    mensagens.length;
+
+  chatMessages.innerHTML = "";
+
+  mensagens.forEach(msg => {
+
+    const roleClass =
+      msg.role === "user"
+        ? "user"
+        : "assistant";
+
+    const roleLabel =
+      msg.role === "user"
+        ? "Cliente"
+        : "Agente";
+
+    chatMessages.innerHTML += `
+      <div class="bubble ${roleClass}">
+
+        <div class="bubble-meta">
+          ${escaparHTML(roleLabel)}
+          •
+          ${escaparHTML(formatarData(msg.created_at))}
+        </div>
+
+        ${escaparHTML(msg.content)}
+
+      </div>
+    `;
+  });
+
+  if (deveScrollar) {
+
+    setTimeout(() => {
+
+      chatMessages.scrollTop =
+        chatMessages.scrollHeight;
+
+    }, 50);
+  }
+}
+
+async function enviarMensagemManual() {
+
+  if (!selectedPhone) {
+
+    alert("Selecione um lead primeiro.");
+
+    return;
+  }
+
+  const mensagem =
+    msgInput.value.trim();
+
+  if (!mensagem) {
+
+    alert("Digite uma mensagem.");
+
+    return;
+  }
+
+  btnSend.disabled = true;
+
+  btnSend.textContent =
+    "Enviando...";
+
+  try {
+
+    const res = await fetch(
+      API + "?debug=send-message",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          token: TOKEN,
+          phone: selectedPhone,
+          message: mensagem
+        })
+      }
+    );
+
+    const data =
+      await res.json();
+
+    if (!res.ok || !data.ok) {
+
+      alert("Erro ao enviar mensagem.");
+
+      console.error(data);
+
+      return;
+    }
+
+    msgInput.value = "";
+
+    await carregarLeads();
+
+    await carregarConversa(
+      selectedPhone,
+      true
+    );
+
+  } catch (err) {
+
+    console.error(err);
+
+    alert("Erro ao enviar mensagem.");
+
+  } finally {
+
+    btnSend.disabled = false;
+
+    btnSend.textContent =
+      "📤 Enviar mensagem";
+  }
+}
+
+async function ativarHumano() {
+
+  if (!selectedPhone) {
+
+    alert("Selecione um lead primeiro.");
+
+    return;
+  }
+
+  btnHuman.disabled = true;
+
+  btnHuman.textContent =
+    "Assumindo...";
+
+  try {
+
+    const res = await fetch(
+      API + "?debug=takeover",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          token: TOKEN,
+          phone: selectedPhone
+        })
+      }
+    );
+
+    const data =
+      await res.json();
+
+    if (!res.ok || !data.ok) {
+
+      alert("Erro ao assumir atendimento.");
+
+      console.error(data);
+
+      return;
+    }
+
+    await carregarLeads();
+
+    await carregarConversa(
+      selectedPhone,
+      true
+    );
+
+  } catch (err) {
+
+    console.error(err);
+
+    alert("Erro ao assumir atendimento.");
+
+  } finally {
+
+    btnHuman.disabled = false;
+
+    btnHuman.textContent =
+      "🔴 Takeover";
+  }
+}
+
+async function voltarIA() {
+
+  if (!selectedPhone) {
+
+    alert("Selecione um lead primeiro.");
+
+    return;
+  }
+
+  const confirmar =
+    confirm(
+      "Tem certeza que deseja liberar a IA novamente para este lead?"
+    );
+
+  if (!confirmar) return;
+
+  btnAI.disabled = true;
+
+  btnAI.textContent =
+    "Liberando...";
+
+  try {
+
+    const res = await fetch(
+      API + "?debug=release-ai",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          token: TOKEN,
+          phone: selectedPhone
+        })
+      }
+    );
+
+    const data =
+      await res.json();
+
+    if (!res.ok || !data.ok) {
+
+      alert("Erro ao liberar IA.");
+
+      console.error(data);
+
+      return;
+    }
+
+    await carregarLeads();
+
+    await carregarConversa(
+      selectedPhone,
+      true
+    );
+
+  } catch (err) {
+
+    console.error(err);
+
+    alert("Erro ao liberar IA.");
+
+  } finally {
+
+    btnAI.disabled = false;
+
+    btnAI.textContent =
+      "🤖 Voltar IA";
+  }
+}
+
+msgInput.addEventListener(
+  "keydown",
+  function(event) {
+
+    if (
+      event.key === "Enter"
+      &&
+      !event.shiftKey
+    ) {
+
+      event.preventDefault();
+
+      enviarMensagemManual();
+    }
+  }
+);
+
+busca.addEventListener(
+  "input",
+  renderLeads
+);
+
+filtroStage.addEventListener(
+  "change",
+  renderLeads
+);
+
+function iniciarDashboard() {
+
+  if (!TOKEN) {
+
+    mostrarLogin();
+
+    return;
+  }
+
+  carregarLeads();
+
+  if (intervalo) {
+    clearInterval(intervalo);
+  }
+
+  intervalo = setInterval(() => {
+
+    if (!TOKEN) return;
+
+    carregarLeads();
+
+    if (selectedPhone) {
+      carregarConversa(selectedPhone);
+    }
+
+  }, 5000);
+}
+
+if (TOKEN) {
+  iniciarDashboard();
+} else {
+  mostrarLogin();
+}
+
+</script>
+
+</body>
+</html>
