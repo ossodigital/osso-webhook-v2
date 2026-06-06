@@ -1,9 +1,25 @@
 import fetch from "node-fetch";
-import FormData from "form-data";
 import { env } from "../config/env.js";
 import detectarStage from "../modules/stages/stageDetector.js";
+import {
+  prepararConteudoImagemReferencia,
+  prepararFallbackImagemReferencia
+} from "../services/ai/media.js";
+import { carregarHistoricoConversa } from "../services/ai/memory.js";
+import { gerarRespostaAtendimento, transcreverAudio } from "../services/ai/openai.js";
+import { sanitizarRespostaLinks } from "../services/ai/prompts.js";
 import { enviarWhatsApp } from "../services/meta/whatsapp.js";
-import { supabase } from "../services/supabase/client.js";
+import {
+  atualizarLeadPorTelefone,
+  buscarLeadPorTelefone,
+  listarLeadsRecentes,
+  upsertLead
+} from "../services/supabase/leadsRepository.js";
+import {
+  inserirMensagem,
+  listarMensagensPorTelefone,
+  listarMensagensRecentes
+} from "../services/supabase/messagesRepository.js";
 
 function validarDashboardToken(req) {
   const dashboardToken = env.DASHBOARD_TOKEN;
@@ -187,11 +203,7 @@ Horário: ${new Date().toISOString()}`
           return res.status(403).json({ ok: false, error: "Acesso negado" });
         }
 
-        const { data, error } = await supabase
-          .from("leads")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(50);
+        const { data, error } = await listarLeadsRecentes(50);
 
         if (error) return res.status(500).json({ ok: false, error: error.message });
         return res.status(200).json({ ok: true, data });
@@ -202,11 +214,7 @@ Horário: ${new Date().toISOString()}`
           return res.status(403).json({ ok: false, error: "Acesso negado" });
         }
 
-        const { data, error } = await supabase
-          .from("messages")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(80);
+        const { data, error } = await listarMensagensRecentes(80);
 
         if (error) return res.status(500).json({ ok: false, error: error.message });
         return res.status(200).json({ ok: true, data });
@@ -229,12 +237,7 @@ Horário: ${new Date().toISOString()}`
           });
         }
 
-        const { data, error } = await supabase
-          .from("messages")
-          .select("*")
-          .eq("phone", phone)
-          .order("created_at", { ascending: true })
-          .limit(200);
+        const { data, error } = await listarMensagensPorTelefone(phone, 200);
 
         if (error) {
           return res.status(500).json({
@@ -266,11 +269,7 @@ Horário: ${new Date().toISOString()}`
 
     const phone = msg.from;
 
-    const { data: existingLead, error: existingLeadError } = await supabase
-      .from("leads")
-      .select("*")
-      .eq("phone", phone)
-      .maybeSingle();
+    const { data: existingLead, error: existingLeadError } = await buscarLeadPorTelefone(phone);
 
     if (existingLeadError) {
       console.error("SUPABASE EXISTING LEAD ERROR:", existingLeadError);
@@ -279,21 +278,16 @@ Horário: ${new Date().toISOString()}`
     if (existingLead?.stage === "humano") {
       const humanUserText = extrairTextoBasicoMensagem(msg);
 
-      await supabase
-        .from("messages")
-        .insert({
-          phone,
-          role: "user",
-          content: humanUserText
-        });
+      await inserirMensagem({
+        phone,
+        role: "user",
+        content: humanUserText
+      });
 
-      await supabase
-        .from("leads")
-        .update({
-          last_message: humanUserText,
-          updated_at: new Date().toISOString()
-        })
-        .eq("phone", phone);
+      await atualizarLeadPorTelefone(phone, {
+        last_message: humanUserText,
+        updated_at: new Date().toISOString()
+      });
 
       console.log("ATENDIMENTO HUMANO ATIVO — IA BLOQUEADA:", phone);
 
@@ -319,46 +313,14 @@ Horário: ${new Date().toISOString()}`
       try {
         const mediaUrl = await getMediaUrl(msg.image.id);
         const buffer = await downloadMedia(mediaUrl);
-        const base64 = Buffer.from(buffer).toString("base64");
-
-        userText = "cliente enviou imagem de referência de tattoo";
-
-        userContent = [
-          {
-            type: "text",
-            text: `O cliente enviou uma referência de tatuagem.
-
-Analise a imagem e:
-- identifique o estilo
-- sugira tamanho ideal
-- sugira possíveis locais do corpo
-- peça apenas o que faltar para orçamento
-- identifique o que o cliente já informou
-- não repita perguntas
-- seja direto, humano e profissional`
-          },
-          {
-            type: "image_url",
-            image_url: {
-              url: `data:image/jpeg;base64,${base64}`
-            }
-          }
-        ];
+        const imageContent = prepararConteudoImagemReferencia(buffer);
+        userText = imageContent.userText;
+        userContent = imageContent.userContent;
       } catch (err) {
         console.error("ERRO IMAGEM:", err);
-        userText = "cliente enviou imagem de tattoo";
-        userContent = [
-          {
-            type: "text",
-            text: `Cliente enviou uma imagem de referência de tatuagem.
-
-Ajude no atendimento:
-- diga que recebeu a referência
-- peça tamanho em cm se faltar
-- peça local do corpo se faltar
-- conduza para orçamento sem repetir perguntas`
-          }
-        ];
+        const imageFallback = prepararFallbackImagemReferencia();
+        userText = imageFallback.userText;
+        userContent = imageFallback.userContent;
       }
     }
 
@@ -394,24 +356,22 @@ Ajude no atendimento:
       leadPayload.last_followup_at = null;
     }
 
-    const { error: leadError } = await supabase
-      .from("leads")
-      .upsert(leadPayload, { onConflict: "phone" });
+    const { error: leadError } = await upsertLead(leadPayload);
 
     if (leadError) console.error("SUPABASE LEAD ERROR:", leadError);
 
-    const { error: userMsgError } = await supabase
-      .from("messages")
-      .insert({ phone, role: "user", content: userText });
+    const { error: userMsgError } = await inserirMensagem({ phone, role: "user", content: userText });
 
     if (userMsgError) console.error("SUPABASE USER MSG ERROR:", userMsgError);
 
     if (!leadName) {
       const nameReply = "Claro! Antes de continuar, como posso te chamar? 😊";
 
-      const { error: assistantNameMsgError } = await supabase
-        .from("messages")
-        .insert({ phone, role: "assistant", content: nameReply });
+      const { error: assistantNameMsgError } = await inserirMensagem({
+        phone,
+        role: "assistant",
+        content: nameReply
+      });
 
       if (assistantNameMsgError) {
         console.error("SUPABASE ASSISTANT NAME MSG ERROR:", assistantNameMsgError);
@@ -422,117 +382,17 @@ Ajude no atendimento:
       return res.status(200).send("ok");
     }
 
-    const { data: history, error: historyError } = await supabase
-      .from("messages")
-      .select("role, content")
-      .eq("phone", phone)
-      .order("created_at", { ascending: false })
-      .limit(4);
+    const { historyError, conversationHistory } = await carregarHistoricoConversa(phone, 4);
 
     if (historyError) console.error("SUPABASE HISTORY ERROR:", historyError);
 
-    const conversationHistory = (history || [])
-      .reverse()
-      .map((item) => ({
-        role: item.role,
-        content: item.content
-      }));
+    let reply = await gerarRespostaAtendimento({
+      leadName,
+      conversationHistory,
+      userContent
+    });
 
-    let reply = "Me conta melhor sua ideia 👍";
-
-    try {
-      const aiResponse = await fetch(
-        `${env.AZURE_ENDPOINT}/openai/deployments/${env.AZURE_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`,
-        {
-          method: "POST",
-          headers: {
-            "api-key": env.AZURE_API_KEY,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            messages: [
-              {
-                role: "system",
-                content: `Você é o atendimento oficial do Tattoo Até os Ossos.
-
-Nome do cliente: ${leadName}
-
-Regras principais:
-- fale como humano, direto e profissional
-- nunca diga que é IA
-- nunca envie links
-- nunca erre os instagrams
-- use o histórico da conversa para não repetir perguntas
-- identifique o que o cliente já informou
-- conduza para orçamento e agendamento com naturalidade
-- não force agendamento antes de entender tamanho, local e ideia
-- se o cliente parecer curioso, responda curto e conduza com uma pergunta útil
-- responda sempre em até 3 linhas, salvo quando o cliente pedir explicação detalhada
-- faça no máximo 1 pergunta por resposta
-- não escreva textos longos
-- use o nome do cliente naturalmente, mas não em toda mensagem
-- se o cliente demonstrar intenção clara de fechar, pagar sinal, reservar horário ou pedir atendimento humano, avise que vai encaminhar para o Coringa finalizar
-
-Captação obrigatória:
-- O nome do cliente já foi capturado no sistema.
-- Nunca peça o nome novamente.
-- Prioridade do atendimento: ideia da tattoo → tamanho em cm → local do corpo → referência → orçamento/agendamento.
-
-Handoff humano:
-- Quando o cliente estiver pronto para fechar, pagar sinal, reservar horário ou pedir humano, responda curto informando que o atendimento será encaminhado ao Coringa.
-- Não continue tentando vender depois do handoff.
-- Não diga que é robô ou IA.
-
-Instagram:
-Coringa: @coringatattoosp
-Jennyfer: @jennyfertattoopierce
-Estúdio: @tattooateosossos
-
-Se o cliente pedir instagram, trabalhos ou portfólio, responda exatamente:
-Coringa: @coringatattoosp
-Jennyfer: @jennyfertattoopierce
-Estúdio: @tattooateosossos
-
-Orçamento:
-- pedir tamanho em cm, local do corpo e ideia/referência quando faltar
-- não passar preço seco sem contexto
-- pequenas: a partir de R$150
-- sessão mínima para projetos grandes: R$650
-
-Agendamento:
-- horários padrão: 10h / 14h / 17h
-- sinal: R$100
-- o sinal é descontado no valor final`
-              },
-              ...conversationHistory,
-              {
-                role: "user",
-                content: userContent
-              }
-            ],
-            temperature: 0.5,
-            max_tokens: 220
-          })
-        }
-      );
-
-      const data = await aiResponse.json();
-      console.log("AZURE CHAT RESULT:", data);
-
-      if (!aiResponse.ok) {
-        console.error("AZURE ERROR:", data);
-      } else {
-        reply = data?.choices?.[0]?.message?.content?.trim() || reply;
-      }
-    } catch (err) {
-      console.error("ERRO AZURE FETCH:", err);
-    }
-
-    if (/http|instagram\.com/i.test(reply)) {
-      reply = `Coringa: @coringatattoosp
-Jennyfer: @jennyfertattoopierce
-Estúdio: @tattooateosossos`;
-    }
+    reply = sanitizarRespostaLinks(reply);
 
     const newStage = detectarStage(userText, stage);
 
@@ -557,10 +417,7 @@ Vou encaminhar seu atendimento direto pro Coringa finalizar certinho com você.`
       updatePayload.last_followup_at = null;
     }
 
-    const { error: updateLeadError } = await supabase
-      .from("leads")
-      .update(updatePayload)
-      .eq("phone", phone);
+    const { error: updateLeadError } = await atualizarLeadPorTelefone(phone, updatePayload);
 
     if (updateLeadError) {
       console.error("SUPABASE UPDATE LEAD ERROR:", updateLeadError);
@@ -575,9 +432,11 @@ Vou encaminhar seu atendimento direto pro Coringa finalizar certinho com você.`
       });
     }
 
-    const { error: assistantMsgError } = await supabase
-      .from("messages")
-      .insert({ phone, role: "assistant", content: reply });
+    const { error: assistantMsgError } = await inserirMensagem({
+      phone,
+      role: "assistant",
+      content: reply
+    });
 
     if (assistantMsgError) {
       console.error("SUPABASE ASSISTANT MSG ERROR:", assistantMsgError);
@@ -617,63 +476,3 @@ async function downloadMedia(url) {
   return await res.arrayBuffer();
 }
 
-async function transcreverAudio(mediaId) {
-  const mediaRes = await fetch(`https://graph.facebook.com/v19.0/${mediaId}`, {
-    headers: { Authorization: `Bearer ${env.WHATSAPP_TOKEN}` }
-  });
-
-  const mediaData = await mediaRes.json();
-  console.log("WHATSAPP AUDIO MEDIA DATA:", mediaData);
-
-  if (!mediaRes.ok || !mediaData?.url) {
-    throw new Error(`Falha ao obter mídia do áudio: ${JSON.stringify(mediaData)}`);
-  }
-
-  const audioRes = await fetch(mediaData.url, {
-    headers: { Authorization: `Bearer ${env.WHATSAPP_TOKEN}` }
-  });
-
-  if (!audioRes.ok) throw new Error("Falha ao baixar áudio");
-
-  const buffer = await audioRes.arrayBuffer();
-  console.log("AUDIO BUFFER SIZE:", buffer.byteLength);
-
-  const form = new FormData();
-
-  form.append("file", Buffer.from(buffer), {
-    filename: "audio.ogg",
-    contentType: "audio/ogg"
-  });
-
-  form.append("model", env.AZURE_WHISPER_DEPLOYMENT);
-
-  const audioDeployment = env.AZURE_WHISPER_DEPLOYMENT;
-  const apiVersion = env.AZURE_AUDIO_API_VERSION || "2025-04-01-preview";
-
-  const transcriptionRes = await fetch(
-    `${env.AZURE_ENDPOINT}/openai/deployments/${audioDeployment}/audio/transcriptions?api-version=${apiVersion}`,
-    {
-      method: "POST",
-      headers: {
-        "api-key": env.AZURE_API_KEY,
-        ...form.getHeaders()
-      },
-      body: form
-    }
-  );
-
-  const result = await transcriptionRes.json();
-  console.log("TRANSCRIÇÃO RESULT:", result);
-
-  if (!transcriptionRes.ok) {
-    throw new Error(`Transcription error: ${JSON.stringify(result)}`);
-  }
-
-  let text = result?.text?.trim() || "quero fazer uma tatuagem";
-
-  if (text.length > 700) {
-    text = text.slice(0, 700);
-  }
-
-  return text;
-}
