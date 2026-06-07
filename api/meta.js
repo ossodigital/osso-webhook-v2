@@ -1,5 +1,6 @@
 import fetch from "node-fetch";
 import { env } from "../config/env.js";
+import { extrairNome } from "../modules/qualification/qualificationRules.js";
 import detectarStage from "../modules/stages/stageDetector.js";
 import {
   prepararConteudoImagemReferencia,
@@ -38,44 +39,6 @@ function getAdminPhones() {
     .split(",")
     .map((phone) => phone.trim())
     .filter(Boolean);
-}
-
-function extrairNome(userText = "") {
-  const text = userText.trim();
-
-  const match = text.match(/(?:meu nome é|me chamo|sou o|sou a|pode me chamar de|me chama de)\s+(.+)/i);
-  if (match?.[1]) {
-    return match[1].trim().split(/[,.!?]/)[0].trim();
-  }
-
-  const textoBaixo = text.toLowerCase();
-
-  const palavrasInvalidas = [
-    "oi",
-    "olá",
-    "ola",
-    "bom dia",
-    "boa tarde",
-    "boa noite",
-    "quero",
-    "valor",
-    "preço",
-    "orcamento",
-    "orçamento",
-    "tattoo",
-    "tatuagem",
-    "agendar",
-    "horário",
-    "horario"
-  ];
-
-  if (palavrasInvalidas.includes(textoBaixo)) return null;
-
-  if (text.length >= 2 && text.length <= 40 && /^[a-zA-ZÀ-ÿ\s'-]+$/.test(text)) {
-    return text;
-  }
-
-  return null;
 }
 
 function extrairTextoBasicoMensagem(msg) {
