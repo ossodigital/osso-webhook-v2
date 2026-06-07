@@ -1,5 +1,6 @@
 import fetch from "node-fetch";
 import { env } from "../config/env.js";
+import { extrairTextoBasicoMensagem } from "../modules/handoff/handoffRules.js";
 import { extrairNome } from "../modules/qualification/qualificationRules.js";
 import detectarStage from "../modules/stages/stageDetector.js";
 import {
@@ -39,22 +40,6 @@ function getAdminPhones() {
     .split(",")
     .map((phone) => phone.trim())
     .filter(Boolean);
-}
-
-function extrairTextoBasicoMensagem(msg) {
-  if (msg.text?.body) {
-    return msg.text.body.trim();
-  }
-
-  if (msg.audio?.id) {
-    return "áudio recebido durante atendimento humano";
-  }
-
-  if (msg.image?.id) {
-    return "imagem recebida durante atendimento humano";
-  }
-
-  return "mensagem recebida durante atendimento humano";
 }
 
 async function alertarAdminLeadHumano({ leadName, phone, userText, stage }) {
