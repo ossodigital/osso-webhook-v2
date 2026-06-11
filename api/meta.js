@@ -10,6 +10,11 @@ import {
 import { carregarHistoricoConversa } from "../services/ai/memory.js";
 import { gerarRespostaAtendimento, transcreverAudio } from "../services/ai/openai.js";
 import { sanitizarRespostaLinks } from "../services/ai/prompts.js";
+import {
+  alertarAdminLeadHumano,
+  getAdminPhones,
+  testarAdminAlerts
+} from "../services/meta/adminAlerts.js";
 import { enviarWhatsApp } from "../services/meta/whatsapp.js";
 import {
   atualizarLeadPorTelefone,
@@ -31,50 +36,6 @@ function validarDashboardToken(req) {
   }
 
   return req.query.token === dashboardToken;
-}
-
-function getAdminPhones() {
-  const phonesRaw = env.ADMIN_PHONES || env.ADMIN_PHONE || "";
-
-  return phonesRaw
-    .split(",")
-    .map((phone) => phone.trim())
-    .filter(Boolean);
-}
-
-async function alertarAdminLeadHumano({ leadName, phone, userText, stage }) {
-  const adminPhones = getAdminPhones();
-
-  if (!adminPhones.length) {
-    console.warn("ADMIN_PHONES ou ADMIN_PHONE não configurado.");
-    return [
-      {
-        ok: false,
-        error: "ADMIN_PHONES ou ADMIN_PHONE não configurado"
-      }
-    ];
-  }
-
-  const mensagemAdmin = `🔥 LEAD PRONTO PRA FECHAR
-
-Nome: ${leadName || "Sem nome"}
-Telefone: ${phone}
-Mensagem: ${userText}
-Stage: ${stage}
-
-Assuma esse atendimento manualmente.`;
-
-  const results = [];
-
-  for (const adminPhone of adminPhones) {
-    const result = await enviarWhatsApp(adminPhone, mensagemAdmin);
-    results.push({
-      adminPhone,
-      ...result
-    });
-  }
-
-  return results;
 }
 
 export default async function handler(req, res) {
@@ -110,40 +71,9 @@ export default async function handler(req, res) {
           return res.status(403).json({ ok: false, error: "Acesso negado" });
         }
 
-        const adminPhones = getAdminPhones();
+        const adminTest = await testarAdminAlerts();
 
-        if (!adminPhones.length) {
-          return res.status(500).json({
-            ok: false,
-            error: "ADMIN_PHONES ou ADMIN_PHONE não configurado"
-          });
-        }
-
-        const results = [];
-
-        for (const adminPhone of adminPhones) {
-          const result = await enviarWhatsApp(
-            adminPhone,
-            `🧪 TESTE ADMIN OSSO ENGINE
-
-Se você recebeu essa mensagem, o alerta admin está funcionando.
-
-Horário: ${new Date().toISOString()}`
-          );
-
-          results.push({
-            adminPhone,
-            metaStatus: result.status,
-            ok: result.ok,
-            metaResponse: result.body
-          });
-        }
-
-        return res.status(200).json({
-          ok: true,
-          adminPhones,
-          results
-        });
+        return res.status(adminTest.status).json(adminTest.body);
       }
 
       if (req.query.debug === "leads") {
