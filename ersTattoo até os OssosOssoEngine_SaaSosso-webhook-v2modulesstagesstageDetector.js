@@ -1,0 +1,20 @@
+[33m9f0b6a4[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m)[m fix: reimplementa bloco dashboard POST e alerta admin no takeover
+[33mc80078c[m docs: checkpoint admin alerts extraction completed
+[33mcc45247[m docs: add extraction order
+[33m62525ff[m docs: add meta controller audit
+[33mf2cb9dc[m docs: freeze current architecture
+[33m93de495[m docs: add official modularization plan
+[33m0273fba[m docs: final audit stage 4
+[33m2e0508b[m feat: extract handoff rules module
+[33m33fe17b[m docs: analyze handoff extraction strategy
+[33m07a1d45[m docs: map handoff architecture
+[33mae9f5ac[m feat: extract qualification rules module
+[33m954408e[m docs: mapa preparatorio etapa 4
+[33m22b9e96[m feat: modularizacao supabase e camada IA
+[33mcd85b9e[m refactor: extract whatsapp client
+[33ma87a64b[m docs: resumo executivo v2
+[33m4c348a9[m docs: plano de migracao v2
+[33mf73e247[m docs: inventario de modulos v2
+[33m5f7f38f[m docs: mapa atual webhook v2
+[33m4e181e9[m docs: documentar arquitetura webhook v2
+[33m6febb4b[m OSSO WEBHOOK V2 LAB
