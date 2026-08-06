@@ -27,6 +27,7 @@ import {
   listarMensagensPorTelefone,
   listarMensagensRecentes
 } from "../services/supabase/messagesRepository.js";
+import { uploadImagemLead } from "../services/supabase/storage.js";
 
 function validarDashboardToken(req) {
   const dashboardToken = env.DASHBOARD_TOKEN;
@@ -294,6 +295,8 @@ export default async function handler(req, res) {
         mediaUrl = await getMediaUrl(msg.image.id);
         mediaType = "image";
         const buffer = await downloadMedia(mediaUrl);
+        const urlPublica = await uploadImagemLead(buffer, phone);
+        if (urlPublica) mediaUrl = urlPublica;
         const imageContent = prepararConteudoImagemReferencia(buffer);
         userText = imageContent.userText;
         userContent = imageContent.userContent;
