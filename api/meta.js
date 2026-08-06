@@ -268,11 +268,19 @@ export default async function handler(req, res) {
 
     let userText = "mensagem";
     let userContent = [{ type: "text", text: "mensagem" }];
+    let mediaUrl = null;
+    let mediaType = null;
 
     if (msg.text?.body) {
       userText = msg.text.body.trim();
       userContent = [{ type: "text", text: userText }];
     } else if (msg.audio?.id) {
+      try {
+        mediaUrl = await getMediaUrl(msg.audio.id);
+        mediaType = "audio";
+      } catch (err) {
+        console.error("ERRO MEDIA URL ÁUDIO:", err);
+      }
       try {
         userText = await transcreverAudio(msg.audio.id);
         userContent = [{ type: "text", text: userText }];
@@ -283,7 +291,8 @@ export default async function handler(req, res) {
       }
     } else if (msg.image?.id) {
       try {
-        const mediaUrl = await getMediaUrl(msg.image.id);
+        mediaUrl = await getMediaUrl(msg.image.id);
+        mediaType = "image";
         const buffer = await downloadMedia(mediaUrl);
         const imageContent = prepararConteudoImagemReferencia(buffer);
         userText = imageContent.userText;
@@ -327,7 +336,13 @@ export default async function handler(req, res) {
     const { error: leadError } = await upsertLead(leadPayload);
     if (leadError) console.error("SUPABASE LEAD ERROR:", leadError);
 
-    const { error: userMsgError } = await inserirMensagem({ phone, role: "user", content: userText });
+    const userMessagePayload = { phone, role: "user", content: userText };
+    if (mediaUrl) {
+      userMessagePayload.media_url = mediaUrl;
+      userMessagePayload.media_type = mediaType;
+    }
+
+    const { error: userMsgError } = await inserirMensagem(userMessagePayload);
     if (userMsgError) console.error("SUPABASE USER MSG ERROR:", userMsgError);
 
     if (!leadName) {

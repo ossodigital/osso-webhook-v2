@@ -1031,6 +1031,14 @@ async function carregarConversa(phone, forceScroll = false) {
         ? "Cliente"
         : "Agente";
 
+    let conteudoHTML = escaparHTML(msg.content);
+
+    if (msg.media_type === "image") {
+      conteudoHTML = `<img src="${escaparHTML(msg.media_url)}">`;
+    } else if (msg.media_type === "audio") {
+      conteudoHTML = `🎤 Áudio: ${escaparHTML(msg.content)}`;
+    }
+
     chatMessages.innerHTML += `
       <div class="bubble ${roleClass}">
 
@@ -1040,7 +1048,7 @@ async function carregarConversa(phone, forceScroll = false) {
           ${escaparHTML(formatarData(msg.created_at))}
         </div>
 
-        ${escaparHTML(msg.content)}
+        ${conteudoHTML}
 
       </div>
     `;
