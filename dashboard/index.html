@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>OSSO DASHBOARD CRM</title>
+  <title>Tattoo Até os Ossos CRM</title>
 
   <style>
     * {
@@ -388,6 +388,68 @@
       margin-bottom: 5px;
     }
 
+    .chat-image {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      border-radius: 10px;
+      cursor: zoom-in;
+    }
+
+    .image-viewer {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: none;
+      flex-direction: column;
+      background: rgba(0, 0, 0, .96);
+    }
+
+    .image-viewer.open {
+      display: flex;
+    }
+
+    .image-viewer-toolbar {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 12px;
+      flex-shrink: 0;
+    }
+
+    .image-viewer-toolbar button {
+      min-width: 44px;
+      min-height: 44px;
+      border: 1px solid #444;
+      border-radius: 10px;
+      background: #1f1f1f;
+      color: #fff;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .image-viewer-content {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      touch-action: pinch-zoom;
+    }
+
+    .image-viewer-content img {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      transform-origin: center center;
+      transition: transform .15s ease;
+      touch-action: pinch-zoom;
+    }
+
     .top-metrics {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -425,24 +487,45 @@
 
       .layout {
         grid-template-columns: 1fr;
+        grid-template-rows: minmax(150px, 38%) minmax(0, 1fr);
       }
 
       .sidebar {
-        height: 40vh;
+        height: auto;
+        min-height: 0;
         border-right: 0;
         border-bottom: 1px solid #222;
       }
 
       .chat-area {
-        height: 60vh;
+        height: auto;
+        min-height: 0;
       }
 
       .chat-buttons {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .chat-buttons .btn-send {
+        grid-column: 1 / -1;
+      }
+
+      .chat-buttons button {
+        min-height: 44px;
+        padding: 11px 8px;
       }
 
       .bubble {
         max-width: 92%;
+      }
+
+      .chat-input-area {
+        padding: 10px;
+        gap: 8px;
+      }
+
+      .chat-input-area textarea {
+        height: 58px;
       }
 
       h1 {
@@ -455,7 +538,12 @@
 <body>
 
 <header>
-  <h1>🔥 OSSO DASHBOARD CRM</h1>
+  <h1>
+    💀 Tattoo Até os Ossos CRM
+    <small style="display:block; margin-top:4px; color:#888; font-size:11px; font-weight:normal;">
+      Powered by Osso Digital
+    </small>
+  </h1>
 
   <div class="header-right">
     <div id="status" class="status"></div>
@@ -475,7 +563,11 @@
 
   <div class="login-card">
 
-    <h2>🔐 Acesso OSSO CRM</h2>
+    <h2>💀 Tattoo Até os Ossos CRM</h2>
+
+    <div style="margin-top:-4px; margin-bottom:18px; color:#00ff88; font-size:14px;">
+      Atendimento Inteligente
+    </div>
 
     <p>
       Digite a senha do painel para entrar.
@@ -619,6 +711,25 @@
 
 </div>
 
+<div
+  id="imageViewer"
+  class="image-viewer"
+  role="dialog"
+  aria-modal="true"
+  aria-label="Visualização da imagem"
+>
+  <div class="image-viewer-toolbar">
+    <button type="button" onclick="alterarZoomImagem(-0.25)" aria-label="Diminuir zoom">−</button>
+    <button type="button" onclick="resetarZoomImagem()" aria-label="Restaurar zoom">1:1</button>
+    <button type="button" onclick="alterarZoomImagem(0.25)" aria-label="Aumentar zoom">+</button>
+    <button type="button" onclick="fecharImagem()" aria-label="Fechar imagem">×</button>
+  </div>
+
+  <div class="image-viewer-content" onclick="fecharImagemAoClicarFora(event)">
+    <img id="imageViewerImg" alt="Imagem ampliada da conversa">
+  </div>
+</div>
+
 <script>
 
 const API =
@@ -675,10 +786,66 @@ const btnHuman =
 const btnAI =
   document.getElementById("btnAI");
 
+const imageViewer =
+  document.getElementById("imageViewer");
+
+const imageViewerImg =
+  document.getElementById("imageViewerImg");
+
 let leadsCache = [];
 let selectedPhone = null;
 let lastMessageCount = 0;
 let intervalo = null;
+let imageZoom = 1;
+
+function aplicarZoomImagem() {
+  imageViewerImg.style.transform =
+    `scale(${imageZoom})`;
+}
+
+function abrirImagem(src) {
+  imageViewerImg.src = src;
+  imageZoom = 1;
+  aplicarZoomImagem();
+  imageViewer.classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+
+function fecharImagem() {
+  imageViewer.classList.remove("open");
+  imageViewerImg.removeAttribute("src");
+  imageZoom = 1;
+  document.body.style.overflow = "";
+}
+
+function alterarZoomImagem(delta) {
+  imageZoom = Math.min(4, Math.max(0.5, imageZoom + delta));
+  aplicarZoomImagem();
+}
+
+function resetarZoomImagem() {
+  imageZoom = 1;
+  aplicarZoomImagem();
+}
+
+function fecharImagemAoClicarFora(event) {
+  if (event.target === event.currentTarget) {
+    fecharImagem();
+  }
+}
+
+chatMessages.addEventListener("click", function(event) {
+  const image = event.target.closest(".chat-image");
+  if (image) {
+    abrirImagem(image.currentSrc || image.src);
+  }
+});
+
+document.addEventListener("keydown", function(event) {
+  if (event.key === "Escape" && imageViewer.classList.contains("open")) {
+    fecharImagem();
+  }
+});
 
 function mostrarLogin() {
 
@@ -1034,7 +1201,7 @@ async function carregarConversa(phone, forceScroll = false) {
     let conteudoHTML = escaparHTML(msg.content);
 
     if (msg.media_type === "image") {
-      conteudoHTML = `<img src="${escaparHTML(msg.media_url)}">`;
+      conteudoHTML = `<img class="chat-image" src="${escaparHTML(msg.media_url)}" alt="Imagem enviada na conversa">`;
     } else if (msg.media_type === "audio") {
       conteudoHTML = `🎤 Áudio: ${escaparHTML(msg.content)}`;
     }
