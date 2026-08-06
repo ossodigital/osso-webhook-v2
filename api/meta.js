@@ -355,7 +355,12 @@ export default async function handler(req, res) {
     const { historyError, conversationHistory } = await carregarHistoricoConversa(phone, 4);
     if (historyError) console.error("SUPABASE HISTORY ERROR:", historyError);
 
-    let reply = await gerarRespostaAtendimento({ leadName, conversationHistory, userContent });
+    let reply = await gerarRespostaAtendimento({
+      leadName,
+      conversationHistory,
+      userContent,
+      imageMode: mediaType === "image"
+    });
     reply = sanitizarRespostaLinks(reply);
 
     const newStage = detectarStage(userText, stage);
