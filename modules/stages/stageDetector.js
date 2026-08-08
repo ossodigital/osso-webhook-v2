@@ -1,3 +1,32 @@
+function temIntencaoDeFechamento(text) {
+  const contextosDeProjeto = [
+    "braço fechado",
+    "braco fechado",
+    "manga fechada",
+    "fechamento de braço",
+    "fechamento de braco",
+    "fechar o braço",
+    "fechar o braco"
+  ];
+
+  if (contextosDeProjeto.some((contexto) => text.includes(contexto))) {
+    return false;
+  }
+
+  const textoSemPontuacaoFinal = text.replace(/[.!?]+$/g, "").trim();
+  if (textoSemPontuacaoFinal === "fechado") return true;
+
+  return [
+    "quero fechar",
+    "fechar agora",
+    "vamos fechar",
+    "pode fechar",
+    "bora fechar",
+    "ta bom vamos fechar",
+    "tá bom vamos fechar"
+  ].some((intencao) => text.includes(intencao));
+}
+
 export default function detectarStage(userText = "", existingStage = null) {
   const text = userText.toLowerCase().trim();
 
@@ -17,9 +46,7 @@ export default function detectarStage(userText = "", existingStage = null) {
     text.includes("marcar tatuagem") ||
     text.includes("quero agendar") ||
     text.includes("pode agendar") ||
-    text.includes("quero fechar") ||
-    text.includes("fechar agora") ||
-    text.includes("vamos fechar") ||
+    temIntencaoDeFechamento(text) ||
     text.includes("vou pagar") ||
     text.includes("manda pix") ||
     text.includes("manda o pix") ||
@@ -34,11 +61,7 @@ export default function detectarStage(userText = "", existingStage = null) {
     text.includes("pagar o sinal") ||
     text.includes("quanto é o sinal") ||
     text.includes("quanto e o sinal") ||
-    text.includes("aceito") ||
-    text.includes("fechado") ||
-    text.includes("bora fechar") ||
-    text.includes("ta bom vamos fechar") ||
-    text.includes("tá bom vamos fechar")
+    text.includes("aceito")
   ) {
     return "humano";
   }
