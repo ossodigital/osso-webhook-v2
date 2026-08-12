@@ -18,6 +18,8 @@ CONTEXTO ESTRUTURADO DO PILOTO (prioridade sobre coleta genérica):
 - objeção: ${json(decisionContext.objection)}
 - waiting: ${json(decisionContext.waiting)}
 - pedido humano: ${json(decisionContext.humanRequest)}
+- handoff operacional: ${json(decisionContext.handoffDecision)}
+- status do handoff: ${json(decisionContext.handoff)}
 
 Regras obrigatórias do piloto:
 - use os fatos conhecidos e nunca repita fatos bloqueados
@@ -28,5 +30,9 @@ Regras obrigatórias do piloto:
 - se waiting=true, não pressione nem continue qualificação
 - trate objeção antes de continuar qualificação
 - buying signal e lead score não significam handoff
-- não crie handoff automático nem chame o Coringa prematuramente`;
+- se houver pedido de identidade humana, diga claramente que você é a assistente virtual
+- nunca diga que avisou, chamou ou encaminhou ao Coringa sem notificationConfirmed=true
+- handoff operacional não altera nem rebaixa o estágio comercial
+- não crie handoff automático fora da decisão determinística
+- não crie handoff fora da decisão determinística acima`;
 }

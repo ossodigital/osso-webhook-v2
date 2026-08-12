@@ -10,7 +10,7 @@ export function getAdminPhones() {
     .filter(Boolean);
 }
 
-export async function alertarAdminLeadHumano({ leadName, phone, userText, stage }) {
+export async function alertarAdminLeadHumano({ leadName, phone, userText, stage, reason = null, handoffId = null }) {
   const adminPhones = getAdminPhones();
 
   if (!adminPhones.length) {
@@ -29,6 +29,8 @@ Nome: ${leadName || "Sem nome"}
 Telefone: ${phone}
 Mensagem: ${userText}
 Stage: ${stage}
+Motivo: ${reason || "solicitação de atendimento humano"}
+Handoff: ${handoffId || "legado"}
 
 Assuma esse atendimento manualmente.`;
 

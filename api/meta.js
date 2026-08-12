@@ -12,6 +12,9 @@ import { gerarRespostaAtendimento, transcreverAudio } from "../services/ai/opena
 import { isPilotAuthorized, preservePilotStage } from "../services/ai/pilotConfig.js";
 import { tryBuildPilotDecisionContext } from "../services/ai/decisionContext.js";
 import { sanitizarRespostaLinks } from "../services/ai/prompts.js";
+import { guardHandoffReply } from "../modules/handoff/falsePromiseGuard.js";
+import { preserveCommercialStage } from "../modules/stages/stageTransitionPolicy.js";
+import { executeHandoff } from "../services/notifications/handoffService.js";
 import {
   alertarAdminLeadHumano,
   getAdminPhones,
@@ -332,6 +335,14 @@ export default async function handler(req, res) {
       }
     }
 
+    if (pilotEnabled) {
+      stage = preserveCommercialStage({
+        previousStage: existingLead?.stage,
+        candidateStage: stage,
+        schedulingIntent: /\b(agendar|agenda|hor[aá]rio|data|dia)\b/iu.test(userText)
+      });
+    }
+
     const leadPayload = {
       phone,
       name: leadName,
@@ -371,7 +382,7 @@ export default async function handler(req, res) {
     const { historyError, conversationHistory } = await carregarHistoricoConversa(phone, 4);
     if (historyError) console.error("SUPABASE HISTORY ERROR:", historyError);
 
-    const decisionContext = pilotEnabled
+    let decisionContext = pilotEnabled
       ? tryBuildPilotDecisionContext({
           phone,
           leadName,
@@ -383,6 +394,17 @@ export default async function handler(req, res) {
         })
       : null;
 
+    if (pilotEnabled && decisionContext?.handoffDecision?.required) {
+      const handoff = await executeHandoff({
+        lead: { phone, name: leadName },
+        decision: decisionContext.handoffDecision,
+        commercialStage: stage,
+        summary: userText,
+        escalationMinutes: process.env.CORINGA_HANDOFF_ESCALATION_MINUTES
+      });
+      decisionContext = { ...decisionContext, handoff };
+    }
+
     let reply = await gerarRespostaAtendimento({
       leadName,
       conversationHistory,
@@ -391,13 +413,23 @@ export default async function handler(req, res) {
       decisionContext
     });
     reply = sanitizarRespostaLinks(reply);
+    if (pilotEnabled) {
+      reply = guardHandoffReply({ reply, handoff: decisionContext?.handoff, leadName });
+    }
 
     const newStage = detectarStage(userText, stage);
-    const effectiveStage = preservePilotStage({
+    let effectiveStage = preservePilotStage({
       pilotEnabled,
       candidateStage: newStage,
       previousStage: stage
     });
+    if (pilotEnabled) {
+      effectiveStage = preserveCommercialStage({
+        previousStage: stage,
+        candidateStage: effectiveStage,
+        schedulingIntent: /\b(agendar|agenda|hor[aá]rio|data|dia)\b/iu.test(userText)
+      });
+    }
 
     if (!pilotEnabled) {
       if (newStage === "humano") {
@@ -422,7 +454,7 @@ export default async function handler(req, res) {
       console.error("SUPABASE UPDATE LEAD ERROR:", updateLeadError);
     }
 
-    if (effectiveStage === "humano" && existingLead?.stage !== "humano") {
+    if (!pilotEnabled && effectiveStage === "humano" && existingLead?.stage !== "humano") {
       await alertarAdminLeadHumano({ leadName, phone, userText, stage: effectiveStage });
     }
 

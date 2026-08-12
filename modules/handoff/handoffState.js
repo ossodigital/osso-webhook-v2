@@ -1,0 +1,21 @@
+export const HANDOFF_STATUS = Object.freeze({
+  NONE: "NONE",
+  REQUIRED: "REQUIRED",
+  NOTIFICATION_PENDING: "NOTIFICATION_PENDING",
+  NOTIFIED: "NOTIFIED",
+  NOTIFICATION_FAILED: "NOTIFICATION_FAILED",
+  TAKEN_OVER: "TAKEN_OVER",
+  RESOLVED: "RESOLVED"
+});
+
+const TRANSITIONS = Object.freeze({
+  NONE: ["REQUIRED"], REQUIRED: ["NOTIFICATION_PENDING"],
+  NOTIFICATION_PENDING: ["NOTIFIED", "NOTIFICATION_FAILED"],
+  NOTIFICATION_FAILED: ["NOTIFICATION_PENDING"], NOTIFIED: ["TAKEN_OVER", "NOTIFICATION_PENDING"],
+  TAKEN_OVER: ["RESOLVED"], RESOLVED: ["REQUIRED"]
+});
+
+export function transitionHandoff(current = HANDOFF_STATUS.NONE, next) {
+  if (!TRANSITIONS[current]?.includes(next)) throw new Error(`Invalid handoff transition: ${current} -> ${next}`);
+  return next;
+}

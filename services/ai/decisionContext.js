@@ -6,6 +6,7 @@ import { calculateLeadScore } from "../../modules/sales/leadScoring.js";
 import { evaluatePricing } from "../../modules/pricing/pricingEngine.js";
 import { classifyObjection } from "../../modules/sales/objectionEngine.js";
 import { maskPilotLead } from "./pilotConfig.js";
+import { decideOperationalHandoff } from "../../modules/handoff/handoffDecision.js";
 
 function userHistory(conversationHistory = []) {
   return conversationHistory
@@ -36,6 +37,8 @@ export function buildPilotDecisionContext({
   const pricing = evaluatePricing({ conversationState: state });
   const objection = classifyObjection({ text: userText, conversationState: state });
   const leadScore = calculateLeadScore(state);
+  const hasCommercialContext = state.facts.tattooIntent.value === true || state.facts.referenceReceived.value === true || Boolean(state.facts.bodyLocation.value);
+  const handoffDecision = decideOperationalHandoff({ text: userText, hasCommercialContext });
 
   return {
     knownFacts: contextPolicy.knownFacts,
@@ -53,7 +56,8 @@ export function buildPilotDecisionContext({
     } : null,
     waiting: contextPolicy.shouldWait,
     humanRequest: state.facts.humanRequest.value === true,
-    handoffCandidate: false,
+    handoffCandidate: handoffDecision.required,
+    handoffDecision,
     leadScore: { score: leadScore.score, level: leadScore.level },
     lead: maskPilotLead(phone)
   };
@@ -72,7 +76,10 @@ export function createSafePilotLogger(logger = console) {
         pricingStatus: context.pricingStatus,
         objection: context.objection?.type || null,
         waiting: context.waiting,
-        handoffCandidate: false
+        handoffCandidate: context.handoffCandidate,
+        handoffReason: context.handoffDecision?.reason || null,
+        handoffStatus: context.handoff?.status || null,
+        notificationConfirmed: context.handoff?.notificationConfirmed === true
       });
     },
     failure(error, phone) {
