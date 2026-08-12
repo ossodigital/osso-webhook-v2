@@ -1180,3 +1180,41 @@ Não foram alterados `services/ai/memory.js`, Conversation State, Collected Fact
 Rollback: remover `modules/memory/leadMemory.js`, `tests/memory/` e esta documentação. Nenhum runtime depende do módulo.
 
 Testes de memória: `18/18`. Suíte oficial completa: `871/871`.
+
+## CRM-011 — CONTEXT & NON-REPETITION
+
+**Status:** `APROVADO` em 2026-08-12, após `PENDENTE → EM DESENVOLVIMENTO → EM TESTE → APROVADO`. Implementação somente em shadow mode, sem consumidor no runtime.
+
+### Arquitetura e contrato
+
+`modules/conversation/contextPolicy.js` consome Lead Memory, Conversation State e o resultado de Sales Strategy. `evaluateContextPolicy({ memory, conversationState, salesStrategy })` retorna `knownFacts`, `missingFacts`, `blockedQuestions`, `nextFact`, `shouldAsk`, `shouldWait`, `decision` e `reason`. Não retorna reply, prompt ou decisão executável de handoff.
+
+Decisões possíveis: `ASK_NEXT_FACT`, `CLARIFY_FACT`, `CLARIFY_PREVIOUS_RESPONSE`, `CONTINUE_SALES`, `WAIT`, `NO_QUESTION` e `HUMAN_REVIEW`.
+
+### Known facts, non-repetition e incerteza
+
+A política opera por chaves semânticas: `NAME`, `TATTOO_INTENT`, `REFERENCE`, `STYLE`, `BODY_LOCATION`, `SIZE` e `FIRST_TATTOO`. Fato explícito, confirmado ou existente com confiança suficiente bloqueia nova pergunta equivalente. A política não depende de frases literais.
+
+Intenção de tattoo e referência recebida são eventos binários confiáveis quando registrados com confiança alta, mesmo que o pipeline legado normalize sua origem como análise/observação. Já estilo, local e demais atributos provenientes apenas de imagem ou inferência continuam disponíveis para confirmação e não são bloqueados automaticamente.
+
+Correção explícita posterior usa o valor atual da Lead Memory. Assim, `panturrilha` substitui `braço` e perguntas futuras não devem confirmar o valor antigo.
+
+### Próximo fato e prioridade da intenção atual
+
+A política escolhe no máximo um próximo fato. A prioridade de qualificação é nome, intenção, referência, local, tamanho, primeira tattoo e estilo; valores já estáveis são ignorados. Se existe valor incerto, a decisão pode ser `CLARIFY_FACT` em vez de repetir coleta.
+
+A intenção atual prevalece sobre qualificação secundária. Pedido de preço, agenda, pagamento, objeção ou humano resulta em continuação da estratégia/revisão correspondente, com `shouldAsk=false` e `nextFact=null`. Structured Context não executa handoff.
+
+### WAIT, retomada, `??` e follow-up futuro
+
+WAIT retorna `shouldAsk=false`, `shouldWait=true` e decisão `WAIT`. Quando o cliente retorna com intenção válida, como `quero marcar`, a Lead Memory limpa WAIT e a policy prioriza agenda sem reiniciar perguntas de referência ou tamanho.
+
+Uma entrada composta somente por `??` retorna `CLARIFY_PREVIOUS_RESPONSE`; não é interpretada como nova qualificação. O contrato permite que follow-up futuro consulte `blockedQuestions` e evite pedir novamente nome, ideia, referência, local ou tamanho já conhecidos, embora o follow-up de produção não tenha sido alterado.
+
+### CASE-001, limites e rollback
+
+No CASE-001, `NAME`, `TATTOO_INTENT`, `REFERENCE` e `BODY_LOCATION` aparecem como conhecidos. `NAME`, `REFERENCE` e `BODY_LOCATION` estão bloqueados; `SIZE` é o único próximo fato. `Braço fechado` não cria decisão de handoff.
+
+Não foram alterados webhook, Prompt Engine, follow-up, banco, dashboard, Pricing, Handoff, Stage, Sales Strategy ou serviços de IA. Rollback: remover o módulo, os dois testes e esta seção documental.
+
+Testes de Context Policy: `20/20`. Suíte oficial completa: `891/891`.

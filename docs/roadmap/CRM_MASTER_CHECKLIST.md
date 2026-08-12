@@ -26,7 +26,7 @@ Os IDs são permanentes. Mudanças de status devem incluir evidência, responsá
 | CRM-008 | Image Context | APROVADO | Análise visual alimenta memória e estratégia sem alterar Storage | 840/840; contexto estruturado apenas em shadow mode, sem analisador no runtime |
 | CRM-009 | Audio Reliability | EM TESTE | Contrato puro protege falhas sem fabricar intenção; runtime ainda não corrigido | MIME, codec, Meta download, Azure endpoint e fallback |
 | CRM-010 | Structured Lead Memory | APROVADO | Memória versionada, provenance, merge e qualificação ausente provados sem integração ao runtime | Persistência física e integração operacional permanecem futuras |
-| CRM-011 | Objection Engine | APROVADO | Objeções classificadas e tratadas sem pressão excessiva | Shadow: estratégias abstratas; calibração real pendente |
+| CRM-011 | Context & Non-Repetition | APROVADO | Fatos conhecidos bloqueiam repetição e intenção atual precede qualificação | Shadow mode; sem prompt, follow-up ou runtime |
 | CRM-012 | WAITING_FOR_CUSTOMER | APROVADO | Estado impede pressão repetitiva sem quebrar follow-up | Shadow: Strategy retorna NO_ACTION; runtime/follow-up intactos |
 | CRM-013 | Coringa Examples | PENDENTE | Exemplos aprovados, anonimizados, versionados e recuperáveis | Dataset, privacidade e revisão humana |
 | CRM-014 | Feedback supervisionado | PENDENTE | Fluxo de aprovação definido antes de alterar dashboard | UX, autorização, auditoria e persistência |
@@ -59,10 +59,10 @@ Os IDs são permanentes. Mudanças de status devem incluir evidência, responsá
 | C | Conversation State | CRM-004, CRM-005, CRM-006, CRM-012 | PENDENTE |
 | D | Memória e Collected Facts | CRM-004 | PENDENTE |
 | E | Structured Lead Memory | CRM-010, CRM-018 | APROVADO |
-| F | Sales Strategy | CRM-005, CRM-011, CRM-012, CRM-015, CRM-016 | PENDENTE |
+| F | Sales Strategy e Context Policy | CRM-005, CRM-011, CRM-012, CRM-015, CRM-016 | APROVADO |
 | G | Pricing Engine | CRM-007 | PENDENTE |
 | H | Lead Scoring | CRM-006, CRM-019 | PENDENTE |
-| I | Objection Engine | CRM-011 | PENDENTE |
+| I | Objection Engine | Pacote A | APROVADO |
 | J | Waiting for Customer | CRM-012 | PENDENTE |
 | K | Image Context | CRM-008 | APROVADO |
 | L | Audio Reliability | CRM-009, CRM-018 | EM TESTE |
@@ -142,13 +142,13 @@ Os IDs são permanentes. Mudanças de status devem incluir evidência, responsá
 - Waiting e objeções não reduzem score; pedido humano não acrescenta pontos.
 - Suíte completa: `797/797`; scorer sem consumidor de runtime, banco ou dashboard.
 
-### PACOTE A — CRM-007 / CRM-011 / CRM-012
+### PACOTE A — CRM-007 / Objection Engine / CRM-012
 
 - Aprovado em shadow mode em 2026-08-10 com `827/827` testes.
 - CRM-007 centraliza mínimo R$150, 3h R$650, 6h R$1.200 e sinal R$100 no novo engine.
 - Durações sem valor oficial e projetos artísticos retornam `HUMAN_REVIEW_REQUIRED`; nenhuma interpolação foi criada.
 - CASE-001 exige revisão humana e não transforma R$850 em regra.
-- CRM-011 classifica oito tipos de objeção e retorna apenas estratégia abstrata.
+- Objection Engine classifica oito tipos de objeção e retorna apenas estratégia abstrata.
 - CRM-012 consolida WAIT e permite coexistência com objeção; Sales Strategy retorna `NO_ACTION`.
 - Pipeline observacional integrado não gera mensagem, não persiste e não executa handoff.
 - Dívida explícita: o Prompt Engine mantém cópia legada dos preços até migração futura autorizada.
@@ -186,6 +186,18 @@ Os IDs são permanentes. Mudanças de status devem incluir evidência, responsá
 - Preço e horas só são lembrados quando explicitamente informados; nenhuma regra de Pricing foi criada.
 - MEM-001 a MEM-018 aprovados, incluindo CASE-001 sem R$850, handoff ou fatos inventados.
 - Testes de memória: `18/18`; suíte oficial completa: `871/871`.
+
+### CRM-011
+
+- Transição nesta fase: `PENDENTE → EM DESENVOLVIMENTO → EM TESTE → APROVADO` em 2026-08-12.
+- Context Policy pura combina Lead Memory, Conversation State e Sales Strategy sem gerar texto ou executar efeitos.
+- Contrato retorna fatos conhecidos/ausentes, perguntas semanticamente bloqueadas, no máximo um próximo fato, decisão, espera e motivo.
+- Fatos explícitos/confirmados não são repetidos; observações ou inferências incertas continuam confirmáveis.
+- Prioridade: esclarecimento de `??`, WAIT, pedido humano, intenção atual e somente depois qualificação.
+- Preço, agenda, pagamento e objeção não são atropelados por perguntas secundárias.
+- Retomada preserva contexto e impede reinício de onboarding ou follow-up genérico.
+- CTX-001 a CTX-020 aprovados, incluindo CASE-001 sem falso handoff.
+- Testes focados: `20/20`; suíte oficial completa: `891/891`.
 
 ## Gate obrigatório para qualquer mudança comportamental
 
