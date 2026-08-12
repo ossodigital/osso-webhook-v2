@@ -691,3 +691,376 @@ Casos positivos preservados:
 ## Primeira alteração pequena e segura recomendada
 
 Revisar o diff e executar teste manual controlado em ambiente não produtivo. Somente depois de aprovação explícita considerar commit e rollout separado. CRM-003 continua pendente; esta correção não separa Stage de Handoff.
+
+## FASE A3 — HANDOFF AUDIT
+
+**Status:** `APROVADA` em 2026-08-10. Auditoria de caracterização; nenhuma regra de produção foi alterada. `CRM-003` continua `PENDENTE`.
+
+### Mapa completo de `detectarStage()`
+
+As regras são avaliadas nesta prioridade e a primeira correspondência vence. Exceto pelo fallback, nenhuma considera o stage anterior.
+
+| ID | Condição/palavras atuais | Retorno | Stage anterior | Risco / efeito posterior |
+|---|---|---|---|---|
+| DS-01 | regex `calote|golpe|zoeira|brincadeira|kkk|kkkk` | `curioso` | ignorado | Pode sobrepor qualquer intenção posterior na mesma frase; persiste stage, sem handoff |
+| DS-02 | reservar/marcar/agendar explícitos; fechamento comercial; `vou pagar`; `manda [o] pix`; pedidos humanos/Coringa/contato; pagar/perguntar sinal; `aceito` | `humano` | ignorado | Regra ampla e heterogênea; substitui reply, persiste `humano`, alerta admin e bloqueia próximas mensagens |
+| DS-03 | regex `pix|cartão|sinal|fechar|quero fazer|quero tatuar|vou fazer|vamos fazer` | `quente` | ignorado | Buying signal amplo; persiste sem handoff |
+| DS-04 | regex `agendar|marcar|horário|agenda|quando pode|qual dia|tem vaga` | `agendamento` | ignorado | Intenção de agenda, sem handoff |
+| DS-05 | regex `preço|valor|quanto|orçamento|custa|tattoo|tatuagem` | `orcamento` | ignorado | Termos genéricos podem rebaixar/alterar classificação; sem handoff |
+| DS-06 | nenhuma correspondência | stage anterior ou `novo` | único caso dependente | Preserva inclusive `humano` no detector isolado |
+
+`temIntencaoDeFechamento()` exclui primeiro `braço fechado`, `manga fechada`, `fechamento de braço` e `fechar o braço`; depois aceita `Fechado` isolado ou as frases `quero/fechar agora/vamos/pode/bora fechar`. A exclusão ocorre antes de DS-03, que ainda pode produzir `quente` quando houver `fechar` ou `quero fazer`.
+
+### Fluxo causal real em `api/meta.js`
+
+1. `takeover` do dashboard persiste diretamente `humano`, consulta o lead e sempre tenta alertar os admins. `release-ai` persiste diretamente `novo`. Nenhum dos dois chama o detector. `send-message` não muda stage.
+2. No webhook, o lead é carregado. Se já estiver em `humano`, a mensagem é persistida em forma básica e a execução retorna `handoff_humano` antes de mídia, detector e IA: este é o bloqueio efetivo.
+3. Texto é extraído; áudio transcrito ou substituído por `quero fazer uma tatuagem` se falhar; imagem normal ou fallback recebe texto sintético contendo `tattoo`.
+4. Primeira chamada: `detectarStage(userText, existingLead?.stage)`. Se um nome é capturado, há chamada adicional com `detectarStage(userText, "novo")`. Portanto são duas chamadas normalmente e três no caminho de captura de nome.
+5. O primeiro `upsertLead` persiste o stage calculado, exceto sem nome: `captando_nome` o sobrescreve. Sem nome, envia pergunta de nome e retorna antes da IA, resposta fixa e alerta.
+6. Com nome, a IA gera a resposta e ela é sanitizada. Segunda chamada normal: `detectarStage(userText, stage)`; usa novamente a mensagem do cliente, nunca a resposta da IA.
+7. Se o resultado for `humano`, a resposta da IA é descartada e substituída pela resposta fixa de encaminhamento.
+8. O resultado final é persistido. Se entrou em `humano` e o snapshot inicial não era `humano`, o alerta admin é enviado; depois a resposta é persistida e enviada ao cliente.
+
+Consequência: `stage = humano`, decisão de handoff, resposta fixa, alerta e bloqueio futuro são hoje o mesmo mecanismo. Takeover entra no mesmo estado por outro caminho; Voltar IA apaga esse estado ao definir `novo`.
+
+### Matriz de caracterização
+
+A fixture `tests/fixtures/handoff-audit-matrix.js` é a fonte executável completa: 60 entradas únicas (incluindo mídia) são verificadas contra `novo`, `curioso`, `quente`, `orcamento`, `agendamento` e `humano`. Para uma regra reconhecida, o resultado independe do anterior; sem regra, preserva o anterior. No webhook real, o guard impede chamar o detector quando o stage persistido já é `humano`.
+
+| Grupo | Resultados atuais | Handoff atual | Regra | Futuro desejado / risco |
+|---|---|---|---|---|
+| Fechamento | `Fechado`, `Quero/Pode/Vamos fechar`, `Quero fechar essa tattoo` → `humano`; `Quero/Fechar o braço` → `quente`; descrições de área → anterior | SIM apenas no primeiro conjunto | DS-02/DS-03/DS-06 | Separar aceite comercial de descrição de projeto; CASE-001 permanece protegido |
+| Sinal | `Quanto é` e `Quero pagar o sinal` → `humano`; demais perguntas/Pix → `quente` | Parcial e inconsistente | DS-02 antes de DS-03 | PAYMENT_INTENT/BUYING_SIGNAL não devem implicar handoff automaticamente; alto risco |
+| Agenda | `Quero marcar/agendar`, `Pode agendar`, `Quero reservar` → `humano`; disponibilidade e `Pode marcar pra sexta` → `agendamento` | Parcial e inconsistente | DS-02 antes de DS-04 | SCHEDULING_INTENT deve ser separado de decisão de handoff |
+| Preço | termos preço/valor/quanto/orçamento/custa → `orcamento`; caro/desconto/parcelar → anterior | NÃO | DS-05/DS-06 | Registrar objeções e condições comerciais sem perder contexto |
+| Contato/humano | contato e pedido pelo Coringa → `humano`; tatuador/pessoa/alguém e perguntas de identidade → anterior | Cobertura parcial | DS-02/DS-06 | Pedidos humanos explícitos equivalentes devem convergir; perguntas de identidade são ambíguas |
+| Interesse | `Quero fazer [tattoo]` → `quente`; demais sinais → anterior | NÃO | DS-03/DS-06 | Registrar buying signals sem handoff |
+| Tattoo/área | `Fechar/Quero fazer o braço` → `quente`; manga/costas/fechamento → anterior | NÃO | DS-03/DS-06 | Tratar como QUALIFICATION_FACT, não handoff |
+| Objeções | todas preservam stage anterior | Somente se anterior já era `humano` | DS-06 | Classificar OBJECTION e evitar pressão/reclassificação acidental |
+
+Comportamento por entrada e stage anterior está explicitamente protegido pela fixture; o handoff é `SIM` quando o stage resultante é `humano`. Isso documenta o comportamento atual, não sua aprovação semântica.
+
+### Taxonomia futura
+
+| Categoria | Gatilhos caracterizados |
+|---|---|
+| `STAGE_SIGNAL` | preço/orçamento, interesse, agenda e descrições de projeto |
+| `BUYING_SIGNAL` | fechar comercialmente, Pix, sinal, `quero fazer`, aceite contextual |
+| `HANDOFF_SIGNAL` | subconjunto cuja política futura decidir encaminhar; não é sinônimo de buying signal |
+| `QUALIFICATION_FACT` | braço/manga/costas fechadas, meia manga, referência de imagem |
+| `OBJECTION` | pensar, consultar esposa, caro/mais barato, desconto, parcelamento, dor/resistência |
+| `PAYMENT_INTENT` | perguntas e ações sobre Pix/sinal |
+| `SCHEDULING_INTENT` | marcar, agendar, reservar e consultar disponibilidade |
+| `HUMAN_REQUEST` | falar com humano/pessoa/alguém/tatuador/Coringa |
+| `AMBIGUOUS` | `Fechado`, `Pode ser`, `Me passa o contato`, `É/Você é o Coringa?` |
+
+Uma frase pode acumular categorias. Em particular, `Quanto é o sinal?` é `PAYMENT_INTENT + BUYING_SIGNAL`, não necessariamente `HANDOFF_SIGNAL`; `Quero marcar` é `SCHEDULING_INTENT`, não necessariamente handoff; `Quero falar com o Coringa` é `HUMAN_REQUEST` e candidato forte a handoff.
+
+### Bugs novos (registrados, não corrigidos)
+
+| ID | Input | Atual | Esperado futuro | Causa / risco | Arquivo/regra |
+|---|---|---|---|---|---|
+| BUG-002 | `Quanto é o sinal?` | `humano`, reply fixa, alerta e bloqueio | Responder informação; handoff só por política/intenção concreta | Dúvida informativa acoplada a handoff; alto | `stageDetector.js`, DS-02 |
+| BUG-003 | `Quero falar com uma pessoa/alguém` ou `Posso falar com o tatuador?` | preserva stage; sem handoff em stages não humanos | Reconhecer pedido humano explícito | Falsos negativos e frustração; alto | `stageDetector.js`, ausência em DS-02 |
+| BUG-004 | `Pode marcar pra sexta?` versus `Quero marcar` | `agendamento` versus `humano` | Mesma intenção base, decisão coerente e contextual | Substrings específicas criam políticas divergentes; médio | `stageDetector.js`, DS-02/DS-04 |
+| BUG-005 | qualquer gatilho `humano` antes de informar nome | stage é sobrescrito por `captando_nome`; sem reply/alerta de handoff | Preservar intenção e concluir handoff após identificar ou imediatamente | Pedido humano/pagamento pode ser perdido; alto | `api/meta.js`, sobrescrita e retorno antecipado |
+| BUG-006 | `aceito` em contexto não comercial | `humano` | Usar contexto antes de handoff | Palavra isolada ampla pode gerar falso positivo; alto | `stageDetector.js`, DS-02 |
+
+### Áudio e imagem
+
+- Falha de transcrição usa `quero fazer uma tatuagem`: DS-03 produz `quente` para qualquer stage anterior não bloqueado. Não gera handoff imediato, mas inventa intenção de compra e pode sobrescrever `curioso`, `orcamento` ou `agendamento`. Risco alto de corrupção semântica; CRM-009 não foi iniciado nesta fase.
+- Imagem normal usa `cliente enviou imagem de referência de tattoo`; fallback usa `cliente enviou imagem de tattoo`. Ambas acionam DS-05 e produzem `orcamento`, independentemente do stage anterior (salvo `humano`, bloqueado antes da mídia no webhook). Podem reclassificar `quente`/`agendamento` para `orcamento`; não geram handoff.
+
+### Dependências e gate para CRM-003
+
+`READY_FOR_CRM_003 = SIM`: regras, prioridade, persistência, bloqueio, resposta, alertas, takeover/release, mídia e principais variações de stage estão mapeados; CASE-001 e a matriz passam em 378/378 testes; bugs conhecidos estão documentados. CRM-003 deverá separar classificação semântica de decisão de handoff mantendo contratos do dashboard, follow-up, alertas e guard da IA.
+
+## CRM-003 — STAGE / HANDOFF MODULARIZATION
+
+**Status:** `APROVADO` em 2026-08-10, após transição `PENDENTE → EM DESENVOLVIMENTO → EM TESTE → APROVADO` e equivalência integral.
+
+### Arquitetura e contratos
+
+| Camada | Contrato puro | Responsabilidade |
+|---|---|---|
+| `signalClassifier.js` | `classifySignals({ text, previousStage })` | Extrai categorias sem decidir stage, handoff ou executar efeitos |
+| `stageClassifier.js` | `classifyStage({ text, previousStage })` | Classifica somente `novo/curioso/quente/orcamento/agendamento`; não produz `humano` por decisão |
+| `handoffClassifier.js` | `classifyHandoffSignals({ text, signals })` | Produz candidatos e metadados de compatibilidade, sem decidir nem executar |
+| `handoffPolicy.js` | `decideHandoff({ stage, previousStage, signals, handoff, compatibilityMode })` | Retorna somente `{ shouldHandoff, reason }`; modo compatível reproduz a política legada |
+| `stageCompatibility.js` | `toLegacyStage({ stage, handoffDecision })` | Traduz decisão positiva para o stage legado `humano` |
+| `stageDetector.js` | `detectarStage(text, previousStage)` | Fachada temporária; compõe o pipeline e mantém o contrato antigo |
+
+`classifyConversationCompatibility()` expõe stage semântico, sinais, candidatos, decisão e stage legado para testes/shadow local. Não registra logs e não foi conectado a telemetria ou a um segundo caminho de runtime.
+
+### Compatibilidade e efeitos
+
+O pipeline preserva os stages públicos `novo`, `curioso`, `quente`, `orcamento`, `agendamento` e `humano`. As prioridades e substrings legadas permanecem no modo compatível, incluindo BUG-002 a BUG-006. BUG-001 continua corrigido pelos contextos de projeto no classificador de handoff.
+
+`api/meta.js` não foi alterado. Persistência de `humano`, bloqueio da IA, substituição de reply, alerta administrativo, takeover e release continuam exclusivamente no orquestrador existente. Os classificadores não importam Supabase, Meta, OpenAI, HTTP ou configuração de ambiente.
+
+### Testes e OLD vs NEW
+
+- 60 entradas da matriz A3 × 6 stages anteriores = 360 comparações explícitas entre o detector legado congelado em fixture e a nova fachada.
+- Testes unitários cobrem os cinco módulos, composição/shadow, separação entre PAYMENT/BUYING e HANDOFF, modo compatível e BUG-003 preservado.
+- CASE-001 e testes de fechamento continuam ativos.
+- Resultado final: `747/747`, sem divergências OLD vs NEW.
+
+### Riscos
+
+- O modo compatível duplica deliberadamente regras legadas entre classificação semântica e metadados de compatibilidade; mudanças futuras exigem atualizar testes antes da política.
+- `stage = humano` ainda é a representação persistida do efeito, embora a decisão interna já esteja separada.
+- A nova política comercial está desativada; as categorias mais ricas ainda não alteram o atendimento.
+- BUG-002 a BUG-006 continuam presentes por requisito de equivalência.
+
+### Rollback
+
+Rollback trivial: restaurar apenas `modules/stages/stageDetector.js` para a implementação anterior e remover os cinco módulos novos. `api/meta.js`, banco, dashboard, autenticação, schema e integrações não mudaram. A fixture legada documenta o comportamento a restaurar.
+
+## CRM-004 — Conversation State / Collected Facts
+
+**Status:** `APROVADO` em 2026-08-10, após `PENDENTE → EM DESENVOLVIMENTO → EM TESTE → APROVADO`. Implementação exclusivamente paralela; runtime intacto.
+
+### Estrutura e contratos
+
+`modules/qualification/collectedFacts.js` oferece:
+
+- `collectFacts({ text, history, signals, previousFacts, name })`: extrai e acumula somente fatos sustentados por mensagens do cliente, contexto explícito do lead ou metadados de mídia;
+- `createEmptyFacts()`: cria o contrato completo;
+- `hasKnownFact(facts, key)`: diferencia fatos conhecidos, inclusive booleanos `false`, de fatos ausentes;
+- `findMissingFacts(facts)`: lista lacunas sem transformá-las em perguntas.
+
+`services/ai/conversationState.js` oferece:
+
+- `buildConversationState({ previousStage, currentStage, text, history, signals, facts, previousFacts, name })`;
+- `isWaitingForCustomer({ text, facts })`;
+- `selectObjective({ facts, missingFacts, waitingForCustomer })`.
+
+O estado resultante contém `previousStage`, `currentStage`, `signals`, `facts`, `missingFacts`, `objective`, `handoffCandidate` e `waitingForCustomer`. Nenhum desses valores altera stage, handoff, resposta, prompt, follow-up ou persistência.
+
+### Facts, confiança e origem
+
+Todos os campos usam `{ value, confidence, source }`. Ausência é representada por `{ value: null, confidence: null, source: null }`; não se fabricam defaults comerciais.
+
+Campos: `name`, `tattooIntent`, `referenceReceived`, `imageReceived`, `audioReceived`, `tattooStyle`, `bodyLocation`, `approximateSize`, `firstTattoo`, `estimatedHours`, `estimatedPrice`, `objections`, `buyingSignals`, `schedulingIntent`, `paymentIntent` e `humanRequest`.
+
+Origens atuais incluem `customer_message`, `lead_context`, `media_context`, `signal_classifier`, `conversation_analysis` e `explicit_conversation_value`. Preço e horas só são extraídos quando aparecem explicitamente; respostas do assistente não são promovidas a fatos do cliente. `previousFacts` preserva conhecimento acumulado.
+
+### Missing facts e objetivos
+
+As lacunas iniciais auditadas são intenção, referência, local, tamanho aproximado e informação sobre primeira tattoo. Booleano `firstTattoo = false` é um fato conhecido. A lista apenas informa o futuro planejador.
+
+Objetivos observacionais: `DISCOVER_INTENT`, `COLLECT_REFERENCE`, `QUALIFY_PROJECT`, `ESTIMATE_PROJECT`, `HANDLE_OBJECTION`, `SCHEDULE`, `PAYMENT` e `WAIT`.
+
+`waitingForCustomer = true` para `Vou pensar`, `te aviso` e `vou ver e te falo`; permanece `false` para perguntas como `quanto fica?` e `qual dia tem?`. Nenhum efeito foi conectado ao follow-up.
+
+### CASE-001 — Allef
+
+A fixture completa representa o contexto conhecido. Após `Braço fechado`, o estado registra:
+
+- `name = Allef`;
+- `tattooIntent = true`;
+- `referenceReceived = true`;
+- `imageReceived = true`;
+- `bodyLocation = braço fechado`;
+- `currentStage = orcamento`;
+- `humanRequest = false` e `handoffCandidate = false`;
+- `estimatedHours` e `estimatedPrice` ausentes;
+- `missingFacts = [approximateSize, firstTattoo]`;
+- `objective = QUALIFY_PROJECT`.
+
+### Testes, riscos e rollback
+
+Os testes cobrem contrato dos fatos, nome, intenção, referência, imagem, áudio, estilo, local, tamanho, primeira tattoo, preço/horas explícitos, sinais, objeções, lacunas, acúmulo, espera, objetivos e CASE-001. Resultado: `766/766`.
+
+Riscos restantes: extração baseada em padrões é conservadora e não resolve conflitos entre declarações; confidence ainda é categórica; estado não é persistido. Rollback é remover os dois módulos, três testes e a fixture desta fase; nenhum consumidor de runtime os importa.
+
+## CRM-005 — SALES STRATEGY
+
+**Status:** `APROVADO` em 2026-08-10, após `PENDENTE → EM DESENVOLVIMENTO → EM TESTE → APROVADO`. Estratégia executável somente por chamadas explícitas/testes; runtime intacto.
+
+### Contrato puro
+
+`determineSalesStrategy(conversationState)` recebe o estado observacional do CRM-004 e retorna:
+
+```js
+{
+  objective,
+  action,
+  priority,
+  reason,
+  nextFact,
+  shouldWait,
+  shouldHandoff: false
+}
+```
+
+Não existe campo de mensagem/reply. A função não importa serviços, banco, HTTP, ambiente, OpenAI ou Meta e não modifica o objeto recebido.
+
+### Objetivos e ações
+
+Objetivos implementados: `DISCOVER_INTENT`, `COLLECT_REFERENCE`, `QUALIFY_PROJECT`, `ESTIMATE_PROJECT`, `HANDLE_OBJECTION`, `CHECK_BUYING_INTENT`, `SCHEDULE`, `PAYMENT`, `WAIT_FOR_CUSTOMER` e `HANDOFF_CANDIDATE`.
+
+Ações estruturadas correspondentes: descobrir intenção, coletar referência, pedir apenas o próximo fato, preparar estimativa, tratar objeção, checar intenção de compra, avançar agenda, apoiar pagamento, nenhuma ação e sinalizar candidato humano. Nenhuma ação gera texto ou efeito.
+
+### Regras e precedência
+
+1. `waitingForCustomer` vence e retorna `WAIT_FOR_CUSTOMER`, `NO_ACTION` e `shouldWait=true`.
+2. Pedido humano explícito retorna `HANDOFF_CANDIDATE`, mas sempre `shouldHandoff=false` nesta camada.
+3. Pagamento/sinal/Pix retorna `PAYMENT`; agenda retorna `SCHEDULE`; objeção retorna `HANDLE_OBJECTION`.
+4. Aceites positivos diretos como `Gostei`, `Curti`, `Quero essa`, `Pode ser` e `Aceito` retornam `CHECK_BUYING_INTENT`.
+5. Pergunta explícita de preço/orçamento em stage compatível retorna `ESTIMATE_PROJECT`.
+6. Sem intenção: `DISCOVER_INTENT`. Com intenção e sem referência: `COLLECT_REFERENCE`.
+7. Com referência e lacunas essenciais: `QUALIFY_PROJECT`, selecionando somente `bodyLocation`, depois `approximateSize`, depois `firstTattoo`.
+8. Buying signal amplo não pula referência ou qualificação; após fatos essenciais, orienta `CHECK_BUYING_INTENT`.
+9. Contexto suficiente sem outra prioridade retorna `ESTIMATE_PROJECT`.
+
+BUYING SIGNAL não é decisão de handoff. Inclusive `Quanto é o sinal?` produz estratégia `PAYMENT` e `shouldHandoff=false`, embora BUG-002 continue existindo na política legada fora desta camada.
+
+### CASE-001 — Allef
+
+- Após `Quero fazer uma tattoo`: `COLLECT_REFERENCE`, sem handoff.
+- Após imagem: `QUALIFY_PROJECT`, próximo fato `bodyLocation`, sem handoff.
+- Após `Braço fechado` com o histórico conhecido: `QUALIFY_PROJECT` (tamanho é a próxima lacuna), nunca `HANDOFF_CANDIDATE`.
+
+### Shadow mode, testes e riscos
+
+O módulo não é importado por `api/meta.js`, prompt, stage, handoff ou outro consumidor de produção. Shadow mode nesta fase significa somente `Conversation State → decisão → teste`, sem logs.
+
+Testes cobrem recepção, referência, qualificação, estimativa, objeção, buying signal, agenda, pagamento, espera, pedido humano, contrato sem texto e CASE-001. Resultado completo: `780/780`.
+
+Riscos: regras ainda são determinísticas e conservadoras; não há resolução avançada de conflito entre sinais; prioridades precisam de calibração futura; `reason` é diagnóstico interno, não conteúdo para cliente. Rollback é remover `modules/sales/salesStrategy.js` e os dois testes, pois não há integração de runtime.
+
+## CRM-006 — LEAD SCORING
+
+**Status:** `APROVADO` em 2026-08-10, após `PENDENTE → EM DESENVOLVIMENTO → EM TESTE → APROVADO`. Cálculo puro e exclusivo de shadow mode.
+
+### Contrato
+
+`calculateLeadScore(conversationState)` retorna somente:
+
+```js
+{
+  score,      // 0–100
+  level,      // COLD | WARM | HOT | VERY_HOT
+  breakdown   // [{ signal, points, reason }]
+}
+```
+
+O breakdown soma exatamente o score. Quando a soma bruta ultrapassa 100, uma entrada auditável `scoreCap` registra o ajuste. Não existe `shouldHandoff`; score alto nunca executa ou recomenda handoff automaticamente.
+
+### Pesos iniciais
+
+| Evidência | Pontos |
+|---|---:|
+| Intenção de tattoo | 5 |
+| Referência recebida | 10 |
+| Imagem sem referência identificada | 5 |
+| Local do corpo conhecido | 8 |
+| Tamanho aproximado conhecido | 8 |
+| Informação de primeira tattoo conhecida, inclusive `false` | 3 |
+| Pergunta de preço/orçamento | 10 |
+| Estimativa de preço explicitamente conhecida | 10 |
+| Pergunta de duração | 5 |
+| Estimativa de horas explicitamente conhecida | 5 |
+| Buying signal genérico | 10 |
+| Intenção de agenda | 15 |
+| Intenção de pagamento | 20 |
+| Intenção clara de reserva | 20 |
+
+Pedido humano não pontua. Objeções e `waitingForCustomer` não reduzem pontos.
+
+### Levels
+
+- `0–19`: `COLD`
+- `20–39`: `WARM`
+- `40–69`: `HOT`
+- `70–100`: `VERY_HOT`
+
+### Deduplicação
+
+- Referência com imagem soma 10 pela referência, não 10 + 5.
+- Reserva substitui agenda genérica para a mesma mensagem.
+- Pagamento substitui bônus genérico de buying signal derivado de Pix/sinal.
+- Perguntas de preço e duração têm evidências próprias; não recebem também buying genérico apenas por serem perguntas.
+- Cada sinal do breakdown é inserido no máximo uma vez por cálculo.
+
+`Collected Facts` passou a manter perguntas explícitas de preço e duração dentro de `buyingSignals`, permitindo progresso entre mensagens sem inventar `estimatedPrice` ou `estimatedHours`.
+
+### CASE-001 — Allef
+
+Progressão comprovada:
+
+1. `Quero fazer uma tattoo`: 15;
+2. após imagem/referência: 25;
+3. após `Braço fechado`: 33;
+4. após `Quanto fica?`: 43;
+5. após `Quanto tempo demora?`: 48.
+
+`Braço fechado` acrescenta somente qualificação de local e nunca gera handoff. Preço e horas estimados permanecem nulos.
+
+### Shadow mode, limitações e calibração futura
+
+O scorer não é importado por runtime, Sales Strategy, dashboard, banco, prompt, stage ou handoff. Não há persistência nem logs de produção.
+
+Os pesos são heurísticos iniciais, não calibrados. Conversas reais anonimizadas deverão validar distribuição, thresholds, correlação com conversão e possíveis vieses antes de qualquer consumo operacional. Rollback é remover o módulo e os dois testes, além da pequena ampliação observacional de buying signals em Collected Facts.
+
+Testes cobrem vazio, fatos, preço, duração, agenda, pagamento, reserva, objeções, espera, pedido humano, limites, breakdown, deduplicação e CASE-001. Resultado: `797/797`.
+
+## PACOTE A — INTELIGÊNCIA COMERCIAL
+
+**Status:** `APROVADO` em shadow mode em 2026-08-10. Inclui CRM-007, Objection Engine (CRM-011) e consolidação observacional de WAITING_FOR_CUSTOMER (CRM-012). Nenhum componente possui consumidor no runtime.
+
+### CRM-007 — Pricing Engine
+
+`modules/pricing/pricingEngine.js` contém a tabela canônica do novo Pricing Engine:
+
+- mínimo: R$150;
+- sessão oficial de 3h: R$650;
+- sessão oficial de 6h: R$1.200;
+- sinal: R$100.
+
+Contrato: `evaluatePricing({ conversationState, request })` retorna `status`, `estimate`, `knownFacts`, `missingFacts`, `assumptions` e `reason`.
+
+Statuses:
+
+- `INSUFFICIENT_DATA`: faltam intenção, referência ou local;
+- `ESTIMATE_AVAILABLE`: somente valor oficial solicitado (mínimo, sinal, sessão exata de 3h/6h);
+- `HUMAN_REVIEW_REQUIRED`: projeto artístico sem regra determinística ou duração sem valor oficial.
+
+Não há interpolação: 4h e 5h não produzem preço. `assumptions` permanece vazio. A pergunta `Quanto é o sinal?` retorna R$100 no engine sem campo de handoff.
+
+A tabela é a fonte única executável do shadow Pricing Engine. O Prompt Engine de produção ainda contém uma cópia legada dos valores e não foi alterado por proibição desta fase; sua futura migração para consumir configuração compartilhada exige etapa própria com equivalência de prompt.
+
+CASE-001 contém projeto, referência e local, mas nenhuma regra artística determinística: retorna `HUMAN_REVIEW_REQUIRED`, sem R$850. Esse valor observado não foi codificado.
+
+### Objection Engine — CRM-011
+
+`classifyObjection({ text, conversationState })` retorna `{ hasObjection, type, confidence, signals, recommendedStrategy }`, sem texto ao cliente.
+
+Tipos: `PRICE`, `DISCOUNT`, `PAIN`, `TIME`, `INDECISION`, `COMPARISON`, `PAYMENT` e `OTHER`. Estratégias abstratas utilizadas: `EXPLAIN_VALUE`, `CLARIFY_SCOPE`, `EXPLAIN_PROCESS`, `DISCUSS_PAYMENT_OPTIONS`, `WAIT` e `HUMAN_REVIEW`.
+
+Mensagens compostas preservam todos os sinais e uma prioridade determinística. Em `Está caro, vou pensar`, a objeção primária é `PRICE`, `INDECISION` permanece nos sinais e WAIT é representado separadamente.
+
+### WAITING_FOR_CUSTOMER — CRM-012
+
+WAIT consolidado para `Vou pensar`, `vou ver`, `te aviso` e `vou conversar e te falo`. Perguntas de preço, agenda, pagamento e desconto não são WAIT.
+
+Conversation State pode representar simultaneamente objeção e espera. Sales Strategy dá precedência a `WAIT_FOR_CUSTOMER`, retorna `NO_ACTION` e não sugere nova ação. Não houve alteração de follow-up ou envio de mensagem.
+
+### Integração observacional, riscos e rollback
+
+Teste integrado demonstra `Conversation State → Sales Strategy → Lead Scoring → Pricing → Objection → Waiting`, produzindo somente objetos. Não há reply, efeito, persistência, log ou decisão de handoff.
+
+Limitações comerciais ainda abertas:
+
+- não existe fórmula aprovada para 4h, 5h ou outras durações;
+- não existem regras determinísticas por tamanho, estilo, local, complexidade ou cobertura;
+- não está definida a fronteira entre mínimo, sessão e orçamento artístico;
+- parcelamento, desconto e exceções exigem política aprovada;
+- o Prompt Engine legado ainda precisa migrar para a fonte canônica em fase separada;
+- tipos e estratégias de objeção precisam de calibração com conversas reais.
+
+Rollback: remover os dois módulos novos e seus testes, e restaurar apenas as ampliações puras de sinais/WAIT. Runtime não importa nenhum componente do pacote.
+
+Suíte final: `827/827`.

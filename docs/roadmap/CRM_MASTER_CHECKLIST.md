@@ -18,16 +18,16 @@ Os IDs são permanentes. Mudanças de status devem incluir evidência, responsá
 |---|---|---|---|---|
 | CRM-001 | Proteger baseline atual | AUDITANDO | Fixtures e contratos do fluxo atual registrados; rollback confirmado | Working tree já possui alterações anteriores; ausência de testes conversacionais |
 | CRM-002 | Auditar handoff | APROVADO | Gatilhos, casos reais e motivos de transição validados contra histórico | CASE-001 reproduzido; manter testes como baseline |
-| CRM-003 | Separar stage/handoff | PENDENTE | Classificação e decisão independentes, com compatibilidade dos stages atuais | Dashboard, follow-up, alertas e bloqueio da IA |
-| CRM-004 | Memória estruturada | PENDENTE | Fatos conhecidos extraídos sem repetir perguntas e sem alterar banco inicialmente | Qualidade do histórico e resolução de conflitos |
-| CRM-005 | Sales Strategy | PENDENTE | Próximo objetivo comercial definido por contexto e testado | Stage, memória, pricing e objeções |
-| CRM-006 | Lead Scoring | PENDENTE | Score puro, auditável e sem handoff automático | Definição e calibração de sinais |
-| CRM-007 | Pricing Engine | PENDENTE | Fonte única aprovada e estimativas dentro das regras | Aprovação do Coringa; fórmula de horas/preço inexistente |
+| CRM-003 | Separar stage/handoff | APROVADO | Classificação e decisão independentes, com compatibilidade dos stages atuais | 747/747 testes; 360 casos OLD vs NEW; efeitos do orquestrador intactos |
+| CRM-004 | Memória estruturada | APROVADO | Fatos conhecidos extraídos sem repetir perguntas e sem alterar banco inicialmente | 766/766; estado paralelo, sem integração ao runtime |
+| CRM-005 | Sales Strategy | APROVADO | Próximo objetivo comercial definido por contexto e testado | 780/780; shadow mode puro, sem integração ao runtime |
+| CRM-006 | Lead Scoring | APROVADO | Score puro, auditável e sem handoff automático | 797/797; pesos iniciais ainda exigem calibração real |
+| CRM-007 | Pricing Engine | APROVADO | Fonte única aprovada e estimativas dentro das regras | Shadow: somente mínimo, sinal e sessões exatas; demais casos exigem revisão |
 | CRM-008 | Image Context | PENDENTE | Análise visual alimenta memória e estratégia sem alterar Storage | Multimodal, privacidade e qualidade da descrição |
 | CRM-009 | Audio Reliability | AUDITANDO | Causa das falhas identificada; métricas de cada etapa disponíveis | MIME, codec, Meta download, Azure endpoint e fallback |
 | CRM-010 | Prompt Engine modular | PENDENTE | Composição modular equivalente ao prompt atual antes de seleção dinâmica | Ordem dos módulos e empacotamento no deploy |
-| CRM-011 | Objection Engine | PENDENTE | Objeções classificadas e tratadas sem pressão excessiva | Exemplos aprovados e Sales Strategy |
-| CRM-012 | WAITING_FOR_CUSTOMER | PENDENTE | Estado impede pressão repetitiva sem quebrar follow-up | Separação entre resposta imediata e follow-up futuro |
+| CRM-011 | Objection Engine | APROVADO | Objeções classificadas e tratadas sem pressão excessiva | Shadow: estratégias abstratas; calibração real pendente |
+| CRM-012 | WAITING_FOR_CUSTOMER | APROVADO | Estado impede pressão repetitiva sem quebrar follow-up | Shadow: Strategy retorna NO_ACTION; runtime/follow-up intactos |
 | CRM-013 | Coringa Examples | PENDENTE | Exemplos aprovados, anonimizados, versionados e recuperáveis | Dataset, privacidade e revisão humana |
 | CRM-014 | Feedback supervisionado | PENDENTE | Fluxo de aprovação definido antes de alterar dashboard | UX, autorização, auditoria e persistência |
 | CRM-015 | Agenda Engine | PENDENTE | Escopo e integração definidos sem assumir confirmação de agenda | Agenda futura, disponibilidade e handoff |
@@ -42,12 +42,18 @@ Os IDs são permanentes. Mudanças de status devem incluir evidência, responsá
 | ID | Descrição | Status | Evidência |
 |---|---|---|---|
 | BUG-001 | Falso handoff para `Braço fechado` causado pela substring genérica `fechado` | CORRIGIDO EM TESTE | CASE-001 e 37/37 testes de Stage/Handoff aprovados; sem deploy |
+| BUG-002 | Pergunta informativa `Quanto é o sinal?` causa handoff | REGISTRADO | Matriz A3; comportamento preservado, sem correção |
+| BUG-003 | Pedidos explícitos por pessoa/alguém/tatuador não causam handoff | REGISTRADO | Matriz A3; comportamento preservado, sem correção |
+| BUG-004 | Intenções equivalentes de agenda divergem entre `humano` e `agendamento` | REGISTRADO | Matriz A3; comportamento preservado, sem correção |
+| BUG-005 | Gatilho humano de lead sem nome é sobrescrito por `captando_nome` | REGISTRADO | Fluxo causal de `api/meta.js`; sem correção |
+| BUG-006 | `aceito` isolado pode causar falso handoff sem contexto comercial | REGISTRADO | Regra DS-02; sem correção |
 
 ## Mapa de fases
 
 | Fase | Escopo | IDs | Status atual |
 |---|---|---|---|
 | A | Correções de base | CRM-001, CRM-002, CRM-018, BUG-001 | EM DESENVOLVIMENTO |
+| A3 | Auditoria completa dos gatilhos de handoff | CRM-002, CRM-003, CRM-018, BUG-002–006 | APROVADO |
 | B | Separação Stage/Handoff | CRM-003 | PENDENTE |
 | C | Conversation State | CRM-004, CRM-005, CRM-006, CRM-012 | PENDENTE |
 | D | Memória e Collected Facts | CRM-004 | PENDENTE |
@@ -85,6 +91,66 @@ Os IDs são permanentes. Mudanças de status devem incluir evidência, responsá
 - Histórico integral de produção continua desejável como evidência operacional, mas não é necessário para reproduzir o defeito no código atual.
 - BUG-001 corrigido em teste por detecção conservadora de intenção comercial.
 - CRM-003 permanece `PENDENTE`; Stage e Handoff não foram separados.
+
+### FASE A3 — HANDOFF AUDIT
+
+- Status: `APROVADO` em 2026-08-10.
+- Detector, prioridade das regras e dependência do stage anterior documentados.
+- Cadeia causal de persistência, bloqueio da IA, substituição de reply, alertas, Takeover e Voltar IA documentada.
+- 60 entradas únicas testadas com os stages anteriores `novo`, `curioso`, `quente`, `orcamento`, `agendamento` e `humano`.
+- CASE-001 permanente e suíte Stage/Handoff em `378/378`.
+- BUG-002 a BUG-006 registrados sem alteração de comportamento.
+- Áudio e imagem avaliados somente quanto ao efeito em stage/handoff.
+- `READY_FOR_CRM_003 = SIM`; ao fim da A3, CRM-003 permanecia `PENDENTE` até esta implementação autorizada.
+
+### CRM-003
+
+- Transição auditada: `PENDENTE → EM DESENVOLVIMENTO → EM TESTE → APROVADO` em 2026-08-10.
+- Cinco módulos puros separam stage, sinais, candidatos, política e tradução legada.
+- `stageDetector.js` permanece como fachada compatível; `api/meta.js` não foi alterado.
+- 360 comparações OLD vs NEW cobrem toda a matriz A3 nos seis stages anteriores.
+- Suíte Stage/Handoff: `747/747`; CASE-001 e BUG-001 protegidos.
+- BUG-002 a BUG-006 preservados deliberadamente.
+- Rollback restrito à fachada e aos módulos novos; nenhum banco, dashboard, autenticação ou schema foi alterado.
+
+### CRM-004
+
+- Transição: `PENDENTE → EM DESENVOLVIMENTO → EM TESTE → APROVADO` em 2026-08-10.
+- Collected Facts e Conversation State implementados como funções puras e paralelas.
+- Todos os 16 campos possuem `value`, `confidence` e `source`; ausências permanecem nulas.
+- CASE-001 representa Allef, referência/imagem e `braço fechado` em `orcamento`, sem handoff e sem inventar preço/horas.
+- Missing facts, objetivos e `waitingForCustomer` são apenas observacionais.
+- Suíte completa: `766/766`; `api/meta.js`, prompt, memória atual, stage e política de handoff intactos.
+
+### CRM-005
+
+- Transição: `PENDENTE → EM DESENVOLVIMENTO → EM TESTE → APROVADO` em 2026-08-10.
+- Sales Strategy pura consome Conversation State e retorna objetivo, ação, prioridade, motivo, próximo fato e flags sem gerar resposta.
+- WAIT_FOR_CUSTOMER retorna nenhuma ação; buying signals nunca executam handoff.
+- CASE-001 permanece em coleta/qualificação/estimativa e nunca vira candidato humano.
+- `Quanto é o sinal?` resulta em `PAYMENT` com `shouldHandoff=false` nesta camada; BUG-002 a BUG-006 permanecem intactos na compatibilidade legada.
+- Suíte completa: `780/780`; runtime, prompt, stage, handoff, banco e dashboard não alterados.
+
+### CRM-006
+
+- Transição: `PENDENTE → EM DESENVOLVIMENTO → EM TESTE → APROVADO` em 2026-08-10.
+- Lead Scoring puro retorna somente score, level e breakdown integralmente auditável.
+- Levels: `COLD 0–19`, `WARM 20–39`, `HOT 40–69`, `VERY_HOT 70–100`.
+- Referência/imagem, reserva/agenda e pagamento/buying signal possuem deduplicação explícita.
+- CASE-001 cresce `15 → 25 → 33 → 43 → 48`, sem handoff e sem inventar preço/horas.
+- Waiting e objeções não reduzem score; pedido humano não acrescenta pontos.
+- Suíte completa: `797/797`; scorer sem consumidor de runtime, banco ou dashboard.
+
+### PACOTE A — CRM-007 / CRM-011 / CRM-012
+
+- Aprovado em shadow mode em 2026-08-10 com `827/827` testes.
+- CRM-007 centraliza mínimo R$150, 3h R$650, 6h R$1.200 e sinal R$100 no novo engine.
+- Durações sem valor oficial e projetos artísticos retornam `HUMAN_REVIEW_REQUIRED`; nenhuma interpolação foi criada.
+- CASE-001 exige revisão humana e não transforma R$850 em regra.
+- CRM-011 classifica oito tipos de objeção e retorna apenas estratégia abstrata.
+- CRM-012 consolida WAIT e permite coexistência com objeção; Sales Strategy retorna `NO_ACTION`.
+- Pipeline observacional integrado não gera mensagem, não persiste e não executa handoff.
+- Dívida explícita: o Prompt Engine mantém cópia legada dos preços até migração futura autorizada.
 
 ### CRM-009
 
