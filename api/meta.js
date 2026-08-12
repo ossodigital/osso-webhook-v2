@@ -9,6 +9,8 @@ import {
 } from "../services/ai/media.js";
 import { carregarHistoricoConversa } from "../services/ai/memory.js";
 import { gerarRespostaAtendimento, transcreverAudio } from "../services/ai/openai.js";
+import { isPilotAuthorized, preservePilotStage } from "../services/ai/pilotConfig.js";
+import { tryBuildPilotDecisionContext } from "../services/ai/decisionContext.js";
 import { sanitizarRespostaLinks } from "../services/ai/prompts.js";
 import {
   alertarAdminLeadHumano,
@@ -250,6 +252,7 @@ export default async function handler(req, res) {
     if (!msg) return res.status(200).send("ok");
 
     const phone = msg.from;
+    const pilotEnabled = isPilotAuthorized(phone);
 
     const { data: existingLead, error: existingLeadError } = await buscarLeadPorTelefone(phone);
     if (existingLeadError) {
@@ -310,12 +313,22 @@ export default async function handler(req, res) {
 
     let leadName = existingLead?.name || null;
     let stage = detectarStage(userText, existingLead?.stage);
+    stage = preservePilotStage({
+      pilotEnabled,
+      candidateStage: stage,
+      previousStage: existingLead?.stage
+    });
 
     if (!leadName && existingLead?.stage === "captando_nome") {
       const nomeCapturado = extrairNome(userText);
       if (nomeCapturado) {
         leadName = nomeCapturado;
         stage = detectarStage(userText, "novo");
+        stage = preservePilotStage({
+          pilotEnabled,
+          candidateStage: stage,
+          previousStage: "novo"
+        });
       }
     }
 
@@ -358,23 +371,43 @@ export default async function handler(req, res) {
     const { historyError, conversationHistory } = await carregarHistoricoConversa(phone, 4);
     if (historyError) console.error("SUPABASE HISTORY ERROR:", historyError);
 
+    const decisionContext = pilotEnabled
+      ? tryBuildPilotDecisionContext({
+          phone,
+          leadName,
+          userText,
+          conversationHistory,
+          previousStage: existingLead?.stage,
+          currentStage: stage,
+          imageMode: mediaType === "image"
+        })
+      : null;
+
     let reply = await gerarRespostaAtendimento({
       leadName,
       conversationHistory,
       userContent,
-      imageMode: mediaType === "image"
+      imageMode: mediaType === "image",
+      decisionContext
     });
     reply = sanitizarRespostaLinks(reply);
 
     const newStage = detectarStage(userText, stage);
+    const effectiveStage = preservePilotStage({
+      pilotEnabled,
+      candidateStage: newStage,
+      previousStage: stage
+    });
 
-    if (newStage === "humano") {
-      reply = `Perfeito, ${leadName}! 🙌\n\nVou encaminhar seu atendimento direto pro Coringa finalizar certinho com você.`;
+    if (!pilotEnabled) {
+      if (newStage === "humano") {
+        reply = `Perfeito, ${leadName}! 🙌\n\nVou encaminhar seu atendimento direto pro Coringa finalizar certinho com você.`;
+      }
     }
 
     const updatePayload = {
       name: leadName,
-      stage: newStage,
+      stage: effectiveStage,
       updated_at: new Date().toISOString(),
       last_message: userText
     };
@@ -389,8 +422,8 @@ export default async function handler(req, res) {
       console.error("SUPABASE UPDATE LEAD ERROR:", updateLeadError);
     }
 
-    if (newStage === "humano" && existingLead?.stage !== "humano") {
-      await alertarAdminLeadHumano({ leadName, phone, userText, stage: newStage });
+    if (effectiveStage === "humano" && existingLead?.stage !== "humano") {
+      await alertarAdminLeadHumano({ leadName, phone, userText, stage: effectiveStage });
     }
 
     await inserirMensagem({ phone, role: "assistant", content: reply });

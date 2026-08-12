@@ -35,7 +35,7 @@ Os IDs são permanentes. Mudanças de status devem incluir evidência, responsá
 | CRM-017 | Analytics comercial | PENDENTE | Métricas e eventos definidos sem expor dados pessoais | Taxonomia de eventos e retenção |
 | CRM-018 | Testes de regressão | EM DESENVOLVIMENTO | Texto, imagem, áudio, stage, handoff e operação cobertos | Stage/Handoff iniciado com 37 testes; demais áreas pendentes |
 | CRM-019 | Shadow testing | PENDENTE | Atual e candidato comparados sem responder ao cliente | Versionamento do prompt e ambiente seguro |
-| CRM-020 | Rollout controlado | PENDENTE | Feature flag, métricas, aprovação e rollback testados | Todos os itens críticos aprovados |
+| CRM-020 | Rollout controlado | EM TESTE | Feature flag, métricas, aprovação e rollback testados | Piloto local aprovado; teste real e deploy ainda dependem de autorização |
 
 ## Bugs registrados
 
@@ -69,7 +69,7 @@ Os IDs são permanentes. Mudanças de status devem incluir evidência, responsá
 | M | Coringa Sales Intelligence | CRM-013 | PENDENTE |
 | N | Feedback supervisionado | CRM-014, CRM-017 | PENDENTE |
 | O | Shadow Mode | CRM-019 | PENDENTE |
-| P | Rollout controlado | CRM-020 | PENDENTE |
+| P | Rollout controlado | CRM-020 | EM TESTE |
 
 ## Evidências iniciais
 

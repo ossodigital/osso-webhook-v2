@@ -1,4 +1,6 @@
-export function montarPromptSistema(leadName, { imageMode = false } = {}) {
+import { buildPilotPromptContext } from "./pilotPrompt.js";
+
+export function montarPromptSistema(leadName, { imageMode = false, decisionContext = null } = {}) {
   const base = `Você é o atendimento oficial do Tattoo Até os Ossos.
 Nome do cliente: ${leadName}
 
@@ -162,8 +164,11 @@ Objetivo do agente:
 - nunca substituir o Coringa em decisões importantes
 - toda resposta deve transmitir confiança, profissionalismo, experiência e organização`;
 
+  const pilotContext = buildPilotPromptContext(decisionContext);
+
   if (!imageMode) {
     return `${base}
+${pilotContext}
 
 Formato da resposta:
 - responda sempre em até 3 linhas, salvo quando o cliente pedir explicação detalhada
@@ -172,6 +177,7 @@ Formato da resposta:
   }
 
   return `${base}
+${pilotContext}
 
 MODO ANÁLISE DE IMAGEM DE REFERÊNCIA DE TATTOO
 O cliente acabou de enviar uma foto de referência. Ignore o limite de 3 linhas nesta resposta — aqui você tem espaço pra ser específico e detalhado, mas sem enrolar.

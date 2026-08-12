@@ -502,7 +502,19 @@ Proibidos autoalteração de código, prompt de produção e aprendizado não au
 Nunca ativar simultaneamente Prompt Engine, Stage, Handoff e Pricing novos.
 
 **IDs:** CRM-020.
-**Estado:** PENDENTE.
+**Estado:** EM TESTE.
+
+### Piloto controlado local
+
+- Ativação somente por `CORINGA_AI_PILOT_ENABLED=true` e telefone presente em `CORINGA_AI_PILOT_NUMBERS`.
+- Flag desligada ou telefone fora da allowlist preserva integralmente o fluxo legado.
+- Falha ao montar o contexto de decisão retorna ao prompt legado.
+- O piloto usa memória transitória do contexto já disponível; não cria migração nem persistência nova.
+- Não cria handoffs automáticos; takeover manual permanece soberano.
+- Logs usam telefone mascarado e não registram conteúdo da conversa ou segredos.
+- Evidência local: PILOT-001 a PILOT-014 e suíte oficial 907/907 aprovados.
+- Rollback operacional: desligar `CORINGA_AI_PILOT_ENABLED` e recarregar o ambiente.
+- Produção: não realizada; depende de autorização e validação real com allowlist mínima.
 
 ## Rastreabilidade dos requisitos
 
