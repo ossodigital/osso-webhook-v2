@@ -7,6 +7,14 @@ export const FACT_KEYS = Object.freeze([
   "humanRequest"
 ]);
 
+export const FACT_SOURCE_PRECEDENCE = Object.freeze({
+  model_inference: 1,
+  image_observation: 2,
+  existing_fact: 3,
+  customer_confirmed: 4,
+  customer_explicit: 5
+});
+
 const unknownFact = () => ({ value: null, confidence: null, source: null });
 const knownFact = (value, confidence = "high", source = "customer_message") => ({ value, confidence, source });
 
@@ -44,13 +52,27 @@ function mergePreviousFacts(previousFacts) {
   return facts;
 }
 
-export function collectFacts({ text = "", history = [], signals = null, previousFacts = null, name = null } = {}) {
+function imageFact(field) {
+  if (!field?.value) return null;
+  return knownFact(field.value, field.confidence || "low", field.source || "model_inference");
+}
+
+export function collectFacts({ text = "", history = [], signals = null, previousFacts = null, name = null, imageContext = null } = {}) {
   const facts = mergePreviousFacts(previousFacts);
   const texts = customerTexts(history, text);
   const joined = texts.join("\n").toLowerCase();
   const classifications = texts.map((item) => classifySignals({ text: item }));
   if (signals) classifications.push(signals);
   const categories = new Set(classifications.flatMap((item) => item?.categories || []));
+
+  if (imageContext?.hasReference) {
+    facts.referenceReceived = knownFact(true, "high", "image_observation");
+    facts.imageReceived = knownFact(true, "high", "image_observation");
+  }
+  if (!hasKnownFact(facts, "tattooStyle")) {
+    const observedStyle = imageFact(imageContext?.tattooStyle);
+    if (observedStyle) facts.tattooStyle = observedStyle;
+  }
 
   const explicitName = name || lastMatch(texts, /(?:meu nome [eé]|me chamo|pode me chamar de|me chama de)\s+([\p{L}'-]+(?:\s+[\p{L}'-]+)?)/iu, (match) => match[1]);
   if (explicitName) facts.name = knownFact(String(explicitName).trim(), "high", name ? "lead_context" : "customer_message");
@@ -67,10 +89,10 @@ export function collectFacts({ text = "", history = [], signals = null, previous
   if (!facts.audioReceived.value) facts.audioReceived = knownFact(audioReceived, "high", audioReceived ? "media_context" : "conversation_analysis");
 
   const style = lastMatch(texts, /\b(fineline|fine line|blackwork|realismo|old school|pontilhismo|aquarela|minimalista|tribal|lettering)\b/iu, (match) => match[1].toLowerCase());
-  if (style) facts.tattooStyle = knownFact(style);
+  if (style) facts.tattooStyle = knownFact(style, "high", "customer_explicit");
 
   const location = lastMatch(texts, /\b(bra[cç]o fechado|fechamento de bra[cç]o|meia manga|manga fechada|costas fechadas|antebra[cç]o|bra[cç]o|costas|peito|perna|panturrilha|coxa|ombro|costela|m[aã]o|pesco[cç]o)\b/iu, (match) => match[1].toLowerCase());
-  if (location) facts.bodyLocation = knownFact(location);
+  if (location) facts.bodyLocation = knownFact(location, "high", "customer_explicit");
 
   const size = lastMatch(texts, /\b(\d+(?:[.,]\d+)?)\s*(cm|cent[ií]metros?)\b/iu, (match) => `${match[1].replace(",", ".")} cm`);
   if (size) facts.approximateSize = knownFact(size);

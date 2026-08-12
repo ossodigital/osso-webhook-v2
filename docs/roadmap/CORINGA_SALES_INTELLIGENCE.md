@@ -461,7 +461,7 @@ Follow-up permanece módulo independente.
 Não alterar upload ou Supabase Storage nesta fase.
 
 **IDs:** CRM-008.
-**Estado:** PENDENTE.
+**Estado:** APROVADO EM SHADOW MODE.
 
 ### Fase L — Audio Reliability
 
@@ -1064,3 +1064,35 @@ Limitações comerciais ainda abertas:
 Rollback: remover os dois módulos novos e seus testes, e restaurar apenas as ampliações puras de sinais/WAIT. Runtime não importa nenhum componente do pacote.
 
 Suíte final: `827/827`.
+
+## CRM-008 — IMAGE CONTEXT ESTRUTURADO
+
+**Status:** `APROVADO` em shadow mode em 2026-08-12. Não existe consumidor no runtime nem chamada nova de análise visual.
+
+### Contrato e fronteiras
+
+`buildImageContext({ hasImage, analysis })` recebe uma análise já disponível e retorna estrutura sanitizada com `hasReference`, `tattooStyle`, `bodyPlacementShown`, `composition`, `visualElements`, `colorProfile`, `complexity`, `approximateScale`, `coverageType`, `observations`, `uncertainties` e `copyIntent`.
+
+Campos desconhecidos permanecem `{ value: null, confidence: null, source: null }`. As únicas origens visuais aceitas são `image_observation` e `model_inference`; inferência de modelo declarada como `high` é reduzida para `medium`. O módulo não aceita nem calcula preço, horas ou sessões.
+
+`copyIntent` permanece `null`: receber referência visual não significa pedido de cópia. O módulo também não gera texto, recomendação artística, buying signal, stage ou decisão de handoff.
+
+### Precedência e integração observacional
+
+A precedência registrada em Collected Facts é:
+
+`CUSTOMER_EXPLICIT > CUSTOMER_CONFIRMED > EXISTING_FACT > IMAGE_OBSERVATION > MODEL_INFERENCE`.
+
+Imagem pode marcar `referenceReceived`/`imageReceived` e preencher `tattooStyle` quando o fato ainda estiver ausente. Texto explícito posterior do cliente prevalece. `bodyPlacementShown` nunca alimenta `bodyLocation`: o primeiro descreve o que aparece na referência; o segundo representa o local desejado pelo cliente.
+
+Conversation State aceita `imageContext` pronto ou `imageAnalysis`/`hasImage`, além de reconhecer mídia de imagem no histórico. A propriedade nova é aditiva e preserva chamadas anteriores.
+
+### CASE-001, riscos e rollback
+
+No CASE-001, a imagem é referência religiosa com estilo provável `black and grey / realismo`; elementos visuais só entram quando fornecidos pela análise. `Braço fechado` permanece `bodyLocation` com origem `customer_explicit`. Não há handoff, R$850, horas ou sessões; Pricing retorna `HUMAN_REVIEW_REQUIRED` e Sales Strategy continua fora de handoff.
+
+Limitações: esta fase estrutura dados fornecidos, mas não implementa nem valida um analisador visual em produção. Qualidade, privacidade, vocabulário controlado e calibração de confiança continuam pendentes antes de integração operacional.
+
+Rollback: remover `modules/image/imageContext.js` e seus testes, e retirar somente os parâmetros/propriedade aditivos de Conversation State e a leitura observacional em Collected Facts. Runtime permanece intacto.
+
+Suíte completa: `840/840`.

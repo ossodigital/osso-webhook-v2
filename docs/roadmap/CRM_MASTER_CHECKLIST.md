@@ -23,7 +23,7 @@ Os IDs são permanentes. Mudanças de status devem incluir evidência, responsá
 | CRM-005 | Sales Strategy | APROVADO | Próximo objetivo comercial definido por contexto e testado | 780/780; shadow mode puro, sem integração ao runtime |
 | CRM-006 | Lead Scoring | APROVADO | Score puro, auditável e sem handoff automático | 797/797; pesos iniciais ainda exigem calibração real |
 | CRM-007 | Pricing Engine | APROVADO | Fonte única aprovada e estimativas dentro das regras | Shadow: somente mínimo, sinal e sessões exatas; demais casos exigem revisão |
-| CRM-008 | Image Context | PENDENTE | Análise visual alimenta memória e estratégia sem alterar Storage | Multimodal, privacidade e qualidade da descrição |
+| CRM-008 | Image Context | APROVADO | Análise visual alimenta memória e estratégia sem alterar Storage | 840/840; contexto estruturado apenas em shadow mode, sem analisador no runtime |
 | CRM-009 | Audio Reliability | AUDITANDO | Causa das falhas identificada; métricas de cada etapa disponíveis | MIME, codec, Meta download, Azure endpoint e fallback |
 | CRM-010 | Prompt Engine modular | PENDENTE | Composição modular equivalente ao prompt atual antes de seleção dinâmica | Ordem dos módulos e empacotamento no deploy |
 | CRM-011 | Objection Engine | APROVADO | Objeções classificadas e tratadas sem pressão excessiva | Shadow: estratégias abstratas; calibração real pendente |
@@ -63,7 +63,7 @@ Os IDs são permanentes. Mudanças de status devem incluir evidência, responsá
 | H | Lead Scoring | CRM-006, CRM-019 | PENDENTE |
 | I | Objection Engine | CRM-011 | PENDENTE |
 | J | Waiting for Customer | CRM-012 | PENDENTE |
-| K | Image Context | CRM-008 | PENDENTE |
+| K | Image Context | CRM-008 | APROVADO |
 | L | Audio Reliability | CRM-009, CRM-018 | AUDITANDO |
 | M | Coringa Sales Intelligence | CRM-013 | PENDENTE |
 | N | Feedback supervisionado | CRM-014, CRM-017 | PENDENTE |
@@ -157,6 +157,18 @@ Os IDs são permanentes. Mudanças de status devem incluir evidência, responsá
 - Download Meta, transcrição Azure, persistência e fallback mapeados.
 - Riscos iniciais: MIME forçado, possível divergência de endpoint e fallback semanticamente incorreto.
 - Pendente: logs correlacionados e amostras de áudio que falharam.
+
+### CRM-008
+
+- Transição: `PENDENTE → EM DESENVOLVIMENTO → EM TESTE → APROVADO` em 2026-08-12.
+- `Image Context` puro representa referência, estilo, local mostrado, composição, elementos, perfil de cor, complexidade, escala aproximada, cobertura, observações e incertezas.
+- Valores desconhecidos permanecem `null`; inferência de modelo não pode receber confiança `high` automaticamente.
+- Precedência documentada: `CUSTOMER_EXPLICIT > CUSTOMER_CONFIRMED > EXISTING_FACT > IMAGE_OBSERVATION > MODEL_INFERENCE`.
+- `bodyPlacementShown` descreve somente a referência e nunca preenche `bodyLocation`, que permanece o local desejado informado pelo cliente.
+- Imagem pode registrar recebimento da referência e preencher estilo observacional quando ausente, sem criar preço, horas, sessões, buying signal, intenção de cópia ou handoff.
+- CASE-001 mantém `braço fechado` com origem do cliente, estilo provável em contexto visual e Pricing em `HUMAN_REVIEW_REQUIRED`, sem R$850.
+- Runtime, `api/meta.js`, prompt, Storage, banco, dashboard, Stage, Handoff e Lead Scoring de produção permanecem intactos.
+- Suíte completa: `840/840`. Rollback restrito ao módulo, testes e parâmetros observacionais adicionados a Conversation State/Collected Facts.
 
 ## Gate obrigatório para qualquer mudança comportamental
 

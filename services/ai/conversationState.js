@@ -1,5 +1,6 @@
 import { classifySignals, SIGNAL_CATEGORIES } from "../../modules/conversation/signalClassifier.js";
 import { collectFacts, findMissingFacts } from "../../modules/qualification/collectedFacts.js";
+import { buildImageContext } from "../../modules/image/imageContext.js";
 
 export const CONVERSATION_OBJECTIVES = Object.freeze({
   DISCOVER_INTENT: "DISCOVER_INTENT",
@@ -38,15 +39,21 @@ export function buildConversationState({
   signals = null,
   facts = null,
   previousFacts = null,
-  name = null
+  name = null,
+  imageContext = null,
+  imageAnalysis = null,
+  hasImage = false
 } = {}) {
   const classifiedSignals = signals || classifySignals({ text, previousStage });
+  const historyHasImage = history.some((item) => item?.media_type === "image" || item?.mediaType === "image");
+  const structuredImageContext = imageContext || buildImageContext({ hasImage: hasImage || historyHasImage, analysis: imageAnalysis });
   const collectedFacts = facts || collectFacts({
     text,
     history,
     signals: classifiedSignals,
     previousFacts,
-    name
+    name,
+    imageContext: structuredImageContext
   });
   const missingFacts = findMissingFacts(collectedFacts);
   const waitingForCustomer = isWaitingForCustomer({ text, facts: collectedFacts });
@@ -66,6 +73,7 @@ export function buildConversationState({
     missingFacts,
     objective,
     handoffCandidate,
-    waitingForCustomer
+    waitingForCustomer,
+    imageContext: structuredImageContext
   };
 }
