@@ -25,7 +25,7 @@ Os IDs são permanentes. Mudanças de status devem incluir evidência, responsá
 | CRM-007 | Pricing Engine | APROVADO | Fonte única aprovada e estimativas dentro das regras | Shadow: somente mínimo, sinal e sessões exatas; demais casos exigem revisão |
 | CRM-008 | Image Context | APROVADO | Análise visual alimenta memória e estratégia sem alterar Storage | 840/840; contexto estruturado apenas em shadow mode, sem analisador no runtime |
 | CRM-009 | Audio Reliability | EM TESTE | Contrato puro protege falhas sem fabricar intenção; runtime ainda não corrigido | MIME, codec, Meta download, Azure endpoint e fallback |
-| CRM-010 | Prompt Engine modular | PENDENTE | Composição modular equivalente ao prompt atual antes de seleção dinâmica | Ordem dos módulos e empacotamento no deploy |
+| CRM-010 | Structured Lead Memory | APROVADO | Memória versionada, provenance, merge e qualificação ausente provados sem integração ao runtime | Persistência física e integração operacional permanecem futuras |
 | CRM-011 | Objection Engine | APROVADO | Objeções classificadas e tratadas sem pressão excessiva | Shadow: estratégias abstratas; calibração real pendente |
 | CRM-012 | WAITING_FOR_CUSTOMER | APROVADO | Estado impede pressão repetitiva sem quebrar follow-up | Shadow: Strategy retorna NO_ACTION; runtime/follow-up intactos |
 | CRM-013 | Coringa Examples | PENDENTE | Exemplos aprovados, anonimizados, versionados e recuperáveis | Dataset, privacidade e revisão humana |
@@ -58,7 +58,7 @@ Os IDs são permanentes. Mudanças de status devem incluir evidência, responsá
 | B | Separação Stage/Handoff | CRM-003 | PENDENTE |
 | C | Conversation State | CRM-004, CRM-005, CRM-006, CRM-012 | PENDENTE |
 | D | Memória e Collected Facts | CRM-004 | PENDENTE |
-| E | Prompt Engine modular | CRM-010, CRM-018 | PENDENTE |
+| E | Structured Lead Memory | CRM-010, CRM-018 | APROVADO |
 | F | Sales Strategy | CRM-005, CRM-011, CRM-012, CRM-015, CRM-016 | PENDENTE |
 | G | Pricing Engine | CRM-007 | PENDENTE |
 | H | Lead Scoring | CRM-006, CRM-019 | PENDENTE |
@@ -174,6 +174,18 @@ Os IDs são permanentes. Mudanças de status devem incluir evidência, responsá
 - CASE-001 mantém `braço fechado` com origem do cliente, estilo provável em contexto visual e Pricing em `HUMAN_REVIEW_REQUIRED`, sem R$850.
 - Runtime, `api/meta.js`, prompt, Storage, banco, dashboard, Stage, Handoff e Lead Scoring de produção permanecem intactos.
 - Suíte completa: `840/840`. Rollback restrito ao módulo, testes e parâmetros observacionais adicionados a Conversation State/Collected Facts.
+
+### CRM-010
+
+- Transição nesta fase: `PENDENTE → EM DESENVOLVIMENTO → EM TESTE → APROVADO` em 2026-08-12.
+- `Structured Lead Memory` versionada implementada somente em shadow mode, sem consumidor no runtime e sem persistência física.
+- Provenance segue `CUSTOMER_EXPLICIT > CUSTOMER_CONFIRMED > EXISTING_FACT > IMAGE_OBSERVATION > MODEL_INFERENCE`.
+- Merge incremental preserva fatos conhecidos, ignora `null`, aceita correções de mesma/maior precedência e não promove inferência visual a fato confirmado.
+- Qualificação ausente é estado puro e não gera perguntas nem mensagens.
+- Imagem não transforma `bodyPlacementShown` em `bodyLocation`; áudio inseguro não atualiza memória.
+- Preço e horas só são lembrados quando explicitamente informados; nenhuma regra de Pricing foi criada.
+- MEM-001 a MEM-018 aprovados, incluindo CASE-001 sem R$850, handoff ou fatos inventados.
+- Testes de memória: `18/18`; suíte oficial completa: `871/871`.
 
 ## Gate obrigatório para qualquer mudança comportamental
 

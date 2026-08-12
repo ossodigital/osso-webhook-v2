@@ -1134,3 +1134,49 @@ Esta fase não mede produção, não adiciona retry automático, não registra c
 Rollback: remover `modules/audio/audioContext.js`, `tests/audio/`, esta seção e as entradas correspondentes no checklist. Não há consumidor de runtime.
 
 Testes de áudio: `13/13`. Suíte oficial completa: `853/853`.
+
+## CRM-010 — STRUCTURED LEAD MEMORY
+
+**Status:** `APROVADO` em 2026-08-12, após `PENDENTE → EM DESENVOLVIMENTO → EM TESTE → APROVADO`. O módulo é puro, observacional e não possui consumidor no runtime.
+
+### Auditoria da memória atual
+
+`services/ai/memory.js` chama `buscarHistoricoRecente(phone, limit)` com limite padrão de 4. O repositório consulta Supabase em ordem decrescente e seleciona somente `role, content`; o formatador inverte a lista e entrega `{ role, content }` ao chat. MIME, mídia, confiança, fonte, facts, stage e objetivos não fazem parte desse histórico.
+
+Conversation State consegue receber `previousFacts`, mas somente quando o chamador os fornece explicitamente. Collected Facts copia os valores conhecidos para a próxima avaliação em memória de processo; não há persistência dessa estrutura nem reconstrução automática entre requisições. Com isso, fatos anteriores às quatro mensagens, provenance, correções, WAIT, contexto visual e distinção entre declaração e inferência podem se perder entre interações ou após horas/dias.
+
+### Contrato e merge
+
+`modules/memory/leadMemory.js` define a versão 1 da memória com `identity`, `tattoo`, `commercial`, `objections`, `conversation`, `provenance` e `updatedAt`. `mergeLeadMemory(previousMemory, conversationState)` retorna uma nova estrutura, sem mutar as entradas e sem usar relógio ou efeitos externos.
+
+Valores `null` não apagam conhecimento. Informação nova substitui a anterior somente com precedência igual ou maior; isso permite correção explícita posterior do cliente e impede que observação de imagem ou inferência sobrescreva declaração explícita. Listas de objeções, elementos e notas são acumuladas sem duplicação.
+
+Provenance por caminho usa a precedência já aprovada:
+
+`CUSTOMER_EXPLICIT > CUSTOMER_CONFIRMED > EXISTING_FACT > IMAGE_OBSERVATION > MODEL_INFERENCE`.
+
+Origens legadas de Facts são normalizadas para essa taxonomia. Inferência continua identificada como inferência e nunca é promovida automaticamente.
+
+### Qualificação, preço e estado conversacional
+
+`getMissingQualification(memory)` retorna somente os caminhos ainda desconhecidos entre nome, intenção, referência, estilo, local, tamanho e primeira tattoo. Não gera mensagem nem controla estratégia.
+
+Preço e horas entram apenas quando o Fact possui fonte explícita/confirmada. A memória não calcula, interpola ou consulta Pricing. R$850 pode ser lembrado se a conversa disser explicitamente `Fica R$850`, mas não vira regra comercial.
+
+WAIT é persistido para `vou pensar`, `te aviso` e equivalentes. Uma interação posterior real limpa apenas o estado de espera e preserva os demais fatos. Pedido humano explícito pode marcar `humanRequested=true`, sem decidir ou executar handoff.
+
+### Image Context, Audio Context e CASE-001
+
+Image Context pode fornecer estilo, cobertura, elementos, resumo e notas com provenance visual. `bodyPlacementShown` não alimenta `bodyLocation`; o local desejado continua dependendo do cliente.
+
+Se `audioContext.received=true` e `safeForConversation=false`, o merge retorna a memória anterior sem atualização. Transcrição segura pode ser processada por Conversation State e então contribuir como texto real.
+
+No CASE-001, a memória final sabe `Allef`, intenção de tattoo, referência recebida, `braço fechado` e estilo observado quando fornecido pelo Image Context. Permanecem ausentes preço, horas, sessões, pagamento, agenda e primeira tattoo. Não existe campo ou decisão de handoff, intenção de cópia ou regra R$850.
+
+### Limites e rollback
+
+Não foram alterados `services/ai/memory.js`, Conversation State, Collected Facts, Signals, webhook, Supabase, schema, Prompt, Pricing, Stage, Handoff, Sales Strategy ou OpenAI runtime. Persistência física e integração entre requisições exigem fase posterior autorizada.
+
+Rollback: remover `modules/memory/leadMemory.js`, `tests/memory/` e esta documentação. Nenhum runtime depende do módulo.
+
+Testes de memória: `18/18`. Suíte oficial completa: `871/871`.
