@@ -1096,3 +1096,41 @@ Limitações: esta fase estrutura dados fornecidos, mas não implementa nem vali
 Rollback: remover `modules/image/imageContext.js` e seus testes, e retirar somente os parâmetros/propriedade aditivos de Conversation State e a leitura observacional em Collected Facts. Runtime permanece intacto.
 
 Suíte completa: `840/840`.
+
+## CRM-009 — AUDIO RELIABILITY
+
+**Status:** `EM TESTE` em 2026-08-12, após `AUDITANDO → EM DESENVOLVIMENTO → EM TESTE`. Implementação isolada em shadow mode; nenhuma integração com webhook, Meta, Azure, banco, prompt ou resposta ao cliente.
+
+### Audio Context e regra de segurança
+
+`modules/audio/audioContext.js` define um contrato puro com `received`, `downloadStatus`, `declaredMimeType`, `detectedMimeType`, `transcriptionStatus`, `transcript`, `errorCode`, `retryable`, `safeForConversation` e `source`.
+
+Download usa `NOT_ATTEMPTED`, `SUCCESS` ou `FAILED`. Transcrição usa `NOT_ATTEMPTED`, `SUCCESS`, `FAILED`, `EMPTY` ou `UNSUPPORTED`. Ausência e falha permanecem explícitas; nenhum valor comercial é inferido.
+
+A regra absoluta é aplicada por `getSafeAudioTranscript(audioContext)`: somente transcrição não vazia com status `SUCCESS` e `safeForConversation=true` produz texto. Qualquer falha retorna `null`. Assim, erro técnico não vira mensagem do cliente e não fornece texto válido para Signals, Facts, Stage, Lead Score, Sales Strategy, Pricing ou Handoff.
+
+### BUG-AUDIO-001
+
+**Status:** `PROTEGIDO POR TESTE / NÃO CORRIGIDO NO RUNTIME`.
+
+O runtime atual ainda contém dois caminhos capazes de substituir falha ou transcrição vazia por `quero fazer uma tatuagem`: `services/ai/openai.js` e `api/meta.js`. Eles não foram alterados nesta fase. Os testes novos demonstram o comportamento seguro esperado: `transcript=null`, `safeForConversation=false` e preservação dos stages anteriores `orcamento` e `agendamento`.
+
+### MIME auditado
+
+O caminho atual recebe o identificador da mídia pela Meta, baixa o conteúdo e sempre cria o arquivo enviado ao Azure como `audio.ogg` com `contentType: audio/ogg`. O MIME declarado pela Meta não é propagado, o MIME detectado a partir do conteúdo não é calculado e o MIME efetivamente usado no download não é registrado. Portanto, o runtime assume OGG sem comprovação.
+
+O contrato shadow registra separadamente `declaredMimeType` e `detectedMimeType`, inclusive quando divergem. Proposta para uma fase de runtime: capturar o MIME declarado no webhook/metadata, validar o conteúdo baixado, preservar extensão compatível e registrar somente metadados técnicos seguros antes de enviar ao Azure. Nenhuma correção de MIME foi aplicada agora.
+
+### Retry policy
+
+`isRetryableAudioError(error)` é pura e não executa loop. Timeout, erro temporário, HTTP 429, HTTP 5xx e falha temporária de download são retryable. Arquivo/transcrição vazia, formato não suportado, mídia inválida e demais HTTP 4xx são non-retryable.
+
+### Testes, limites e rollback
+
+AUDIO-001 a AUDIO-010 cobrem sucesso, download, Azure, vazio, MIME divergente, preservação de `orcamento`/`agendamento`, fechamento, espera e texto normal de tattoo. Há teste adicional de downstream safety para todas as camadas futuras listadas.
+
+Esta fase não mede produção, não adiciona retry automático, não registra conteúdo de áudio e não altera `api/meta.js` ou `services/ai/openai.js`. O bug permanece operacional até uma integração futura autorizada.
+
+Rollback: remover `modules/audio/audioContext.js`, `tests/audio/`, esta seção e as entradas correspondentes no checklist. Não há consumidor de runtime.
+
+Testes de áudio: `13/13`. Suíte oficial completa: `853/853`.

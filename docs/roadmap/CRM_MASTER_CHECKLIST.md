@@ -24,7 +24,7 @@ Os IDs são permanentes. Mudanças de status devem incluir evidência, responsá
 | CRM-006 | Lead Scoring | APROVADO | Score puro, auditável e sem handoff automático | 797/797; pesos iniciais ainda exigem calibração real |
 | CRM-007 | Pricing Engine | APROVADO | Fonte única aprovada e estimativas dentro das regras | Shadow: somente mínimo, sinal e sessões exatas; demais casos exigem revisão |
 | CRM-008 | Image Context | APROVADO | Análise visual alimenta memória e estratégia sem alterar Storage | 840/840; contexto estruturado apenas em shadow mode, sem analisador no runtime |
-| CRM-009 | Audio Reliability | AUDITANDO | Causa das falhas identificada; métricas de cada etapa disponíveis | MIME, codec, Meta download, Azure endpoint e fallback |
+| CRM-009 | Audio Reliability | EM TESTE | Contrato puro protege falhas sem fabricar intenção; runtime ainda não corrigido | MIME, codec, Meta download, Azure endpoint e fallback |
 | CRM-010 | Prompt Engine modular | PENDENTE | Composição modular equivalente ao prompt atual antes de seleção dinâmica | Ordem dos módulos e empacotamento no deploy |
 | CRM-011 | Objection Engine | APROVADO | Objeções classificadas e tratadas sem pressão excessiva | Shadow: estratégias abstratas; calibração real pendente |
 | CRM-012 | WAITING_FOR_CUSTOMER | APROVADO | Estado impede pressão repetitiva sem quebrar follow-up | Shadow: Strategy retorna NO_ACTION; runtime/follow-up intactos |
@@ -47,6 +47,7 @@ Os IDs são permanentes. Mudanças de status devem incluir evidência, responsá
 | BUG-004 | Intenções equivalentes de agenda divergem entre `humano` e `agendamento` | REGISTRADO | Matriz A3; comportamento preservado, sem correção |
 | BUG-005 | Gatilho humano de lead sem nome é sobrescrito por `captando_nome` | REGISTRADO | Fluxo causal de `api/meta.js`; sem correção |
 | BUG-006 | `aceito` isolado pode causar falso handoff sem contexto comercial | REGISTRADO | Regra DS-02; sem correção |
+| BUG-AUDIO-001 | Falha ou transcrição vazia pode virar artificialmente `quero fazer uma tatuagem` | PROTEGIDO POR TESTE / NÃO CORRIGIDO NO RUNTIME | AUDIO-002, AUDIO-003, AUDIO-004, AUDIO-006 e AUDIO-007; `api/meta.js` e `services/ai/openai.js` intactos |
 
 ## Mapa de fases
 
@@ -64,7 +65,7 @@ Os IDs são permanentes. Mudanças de status devem incluir evidência, responsá
 | I | Objection Engine | CRM-011 | PENDENTE |
 | J | Waiting for Customer | CRM-012 | PENDENTE |
 | K | Image Context | CRM-008 | APROVADO |
-| L | Audio Reliability | CRM-009, CRM-018 | AUDITANDO |
+| L | Audio Reliability | CRM-009, CRM-018 | EM TESTE |
 | M | Coringa Sales Intelligence | CRM-013 | PENDENTE |
 | N | Feedback supervisionado | CRM-014, CRM-017 | PENDENTE |
 | O | Shadow Mode | CRM-019 | PENDENTE |
@@ -156,7 +157,11 @@ Os IDs são permanentes. Mudanças de status devem incluir evidência, responsá
 
 - Download Meta, transcrição Azure, persistência e fallback mapeados.
 - Riscos iniciais: MIME forçado, possível divergência de endpoint e fallback semanticamente incorreto.
-- Pendente: logs correlacionados e amostras de áudio que falharam.
+- Transição nesta fase: `AUDITANDO → EM DESENVOLVIMENTO → EM TESTE` em 2026-08-12.
+- `Audio Context` e política pura de retry implementados somente em shadow mode, sem consumidor no runtime.
+- BUG-AUDIO-001 protegido pelos casos AUDIO-001 a AUDIO-010, mas não corrigido em `api/meta.js` ou `services/ai/openai.js`.
+- Testes de áudio: `13/13`; suíte oficial completa: `853/853`.
+- Pendente: integração explícita ao runtime, logs correlacionados e amostras anonimizadas de áudio que falharam.
 
 ### CRM-008
 
