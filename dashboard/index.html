@@ -990,7 +990,7 @@ function atualizarMetricas(leads) {
 
   document.getElementById("mHumano").textContent =
     leads.filter(
-      l => l.conversation_owner === "AI_HOLD" || l.conversation_owner === "HUMAN" || l.stage === "humano"
+      l => l.conversation_owner === "HUMAN_PENDING" || l.conversation_owner === "HUMAN" || l.stage === "humano"
     ).length;
 
   document.getElementById("mQuente").textContent =
@@ -1522,7 +1522,7 @@ function iniciarDashboard() {
 
 function ownershipPresentation(lead) {
   if (lead.conversation_owner === "UNKNOWN") return { css: "ai-hold", label: "Estado indisponível" };
-  if (lead.conversation_owner === "AI_HOLD") return { css: "ai-hold", label: "Aguardando Coringa" };
+  if (lead.conversation_owner === "HUMAN_PENDING") return { css: "ai-hold", label: "Humano — aguardando Coringa" };
   if (lead.conversation_owner === "HUMAN" || lead.stage === "humano") return { css: "human", label: "Atendimento humano" };
   return { css: "ai", label: "IA ativa" };
 }

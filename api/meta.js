@@ -13,11 +13,11 @@ import { isPilotAuthorized, preservePilotStage } from "../services/ai/pilotConfi
 import { tryBuildPilotDecisionContext } from "../services/ai/decisionContext.js";
 import { sanitizarRespostaLinks } from "../services/ai/prompts.js";
 import { guardHandoffReply } from "../modules/handoff/falsePromiseGuard.js";
-import { buildHoldReply, evaluateHandoffRuntime } from "../modules/handoff/handoffRuntimePolicy.js";
+import { evaluateHandoffRuntime } from "../modules/handoff/handoffRuntimePolicy.js";
 import { HANDOFF_STATUS } from "../modules/handoff/handoffState.js";
 import { preserveCommercialStage } from "../modules/stages/stageTransitionPolicy.js";
 import { executeHandoff } from "../services/notifications/handoffService.js";
-import { releaseHandoffToAi, resolveNotifiedHandoff, takeoverHandoff } from "../services/handoff/handoffLifecycleService.js";
+import { releaseHandoffToAi, takeoverHandoff } from "../services/handoff/handoffLifecycleService.js";
 import {
   alertarAdminLeadHumano,
   getAdminPhones,
@@ -353,15 +353,6 @@ export default async function handler(req, res) {
         ? { action: "STATE_UNAVAILABLE", shouldCallLlm: false, shouldReply: false }
         : evaluateHandoffRuntime({ status: pilotHandoff.data.status, text: userText });
 
-      if (runtime.action === "RESOLVE_AND_CONTINUE") {
-        const resolved = await resolveNotifiedHandoff(phone);
-        if (!resolved.ok) {
-          console.error("[PILOT] HANDOFF RESOLVE FAILED", { error: resolved.error });
-          runtime.action = "STATE_UNAVAILABLE";
-          runtime.shouldCallLlm = false;
-        }
-      }
-
       if (!runtime.shouldCallLlm) {
         const userMessagePayload = { phone, role: "user", content: userText };
         if (mediaUrl) {
@@ -371,11 +362,6 @@ export default async function handler(req, res) {
         await inserirMensagem(userMessagePayload);
         await atualizarLeadPorTelefone(phone, { last_message: userText, updated_at: new Date().toISOString() });
 
-        if (runtime.shouldReply) {
-          const holdReply = buildHoldReply(existingLead?.name);
-          await inserirMensagem({ phone, role: "assistant", content: holdReply });
-          await enviarWhatsApp(phone, holdReply);
-        }
         return res.status(200).send(runtime.action === "HUMAN_ACTIVE" ? "handoff_humano" : "handoff_hold");
       }
     }
