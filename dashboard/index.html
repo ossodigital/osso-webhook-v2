@@ -352,6 +352,20 @@
       color: #d8a4ff;
     }
 
+    .lead-ownership {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #24313a;
+      color: #b8d8e8;
+      font-size: 12px;
+    }
+
+    .lead-ownership.ai-hold { background: #4a3200; color: #ffd36b; }
+    .lead-ownership.human { background: #5a1111; color: #ff8888; }
+    .lead-ownership.ai { background: #123d2b; color: #83efb6; }
+
     .lead-message {
       color: #aaa;
       font-size: 13px;
@@ -976,7 +990,7 @@ function atualizarMetricas(leads) {
 
   document.getElementById("mHumano").textContent =
     leads.filter(
-      l => l.stage === "humano"
+      l => l.conversation_owner === "AI_HOLD" || l.conversation_owner === "HUMAN" || l.stage === "humano"
     ).length;
 
   document.getElementById("mQuente").textContent =
@@ -1030,6 +1044,7 @@ function renderLeads() {
 
     const stage =
       lead.stage || "novo";
+    const ownership = ownershipPresentation(lead);
 
     leadsBox.innerHTML += `
       <div
@@ -1047,6 +1062,10 @@ function renderLeads() {
 
         <div class="lead-stage ${escaparHTML(stage)}">
           🎯 ${escaparHTML(stage)}
+        </div>
+
+        <div class="lead-ownership ${escaparHTML(ownership.css)}">
+          ${escaparHTML(ownership.label)}
         </div>
 
         <div class="lead-message">
@@ -1110,14 +1129,16 @@ async function carregarLeads() {
 
 function atualizarHeaderLead(lead) {
 
+  const ownership = ownershipPresentation(lead);
+
   chatTitle.innerHTML =
     `${escaparHTML(lead.name || "Sem nome")} — ${escaparHTML(lead.phone)}`;
 
   chatSubtitle.innerHTML =
-    `Stage: ${escaparHTML(lead.stage || "novo")} • Última mensagem: ${escaparHTML(lead.last_message || "")}`;
+    `Stage comercial: ${escaparHTML(lead.stage || "novo")} • Ownership: ${escaparHTML(ownership.label)} • Última mensagem: ${escaparHTML(lead.last_message || "")}`;
 
   manualNote.style.display =
-    lead.stage === "humano"
+    lead.conversation_owner === "HUMAN" || lead.stage === "humano"
       ? "block"
       : "none";
 }
@@ -1497,6 +1518,13 @@ function iniciarDashboard() {
     }
 
   }, 5000);
+}
+
+function ownershipPresentation(lead) {
+  if (lead.conversation_owner === "UNKNOWN") return { css: "ai-hold", label: "Estado indisponível" };
+  if (lead.conversation_owner === "AI_HOLD") return { css: "ai-hold", label: "Aguardando Coringa" };
+  if (lead.conversation_owner === "HUMAN" || lead.stage === "humano") return { css: "human", label: "Atendimento humano" };
+  return { css: "ai", label: "IA ativa" };
 }
 
 if (TOKEN) {

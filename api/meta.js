@@ -13,8 +13,11 @@ import { isPilotAuthorized, preservePilotStage } from "../services/ai/pilotConfi
 import { tryBuildPilotDecisionContext } from "../services/ai/decisionContext.js";
 import { sanitizarRespostaLinks } from "../services/ai/prompts.js";
 import { guardHandoffReply } from "../modules/handoff/falsePromiseGuard.js";
+import { buildHoldReply, evaluateHandoffRuntime } from "../modules/handoff/handoffRuntimePolicy.js";
+import { HANDOFF_STATUS } from "../modules/handoff/handoffState.js";
 import { preserveCommercialStage } from "../modules/stages/stageTransitionPolicy.js";
 import { executeHandoff } from "../services/notifications/handoffService.js";
+import { releaseHandoffToAi, resolveNotifiedHandoff, takeoverHandoff } from "../services/handoff/handoffLifecycleService.js";
 import {
   alertarAdminLeadHumano,
   getAdminPhones,
@@ -33,6 +36,7 @@ import {
   listarMensagensRecentes
 } from "../services/supabase/messagesRepository.js";
 import { uploadImagemLead } from "../services/supabase/storage.js";
+import { buscarHandoffAtivo, listarHandoffsAtivosPorTelefones } from "../services/supabase/handoffRepository.js";
 
 function validarDashboardToken(req) {
   const dashboardToken = env.DASHBOARD_TOKEN;
@@ -112,7 +116,16 @@ export default async function handler(req, res) {
         }
         const { data, error } = await listarLeadsRecentes(50);
         if (error) return res.status(500).json({ ok: false, error: error.message });
-        return res.status(200).json({ ok: true, data });
+        const phones = (data || []).map((lead) => lead.phone).filter(Boolean);
+        const { data: handoffs, error: handoffError } = await listarHandoffsAtivosPorTelefones(phones);
+        if (handoffError) console.error("DASHBOARD HANDOFF LIST ERROR:", handoffError?.name || "HandoffReadError");
+        const byPhone = new Map((handoffs || []).map((handoff) => [handoff.phone, handoff]));
+        const enriched = (data || []).map((lead) => ({
+          ...lead,
+          handoff_status: handoffError ? "UNKNOWN" : byPhone.get(lead.phone)?.status || HANDOFF_STATUS.NONE,
+          conversation_owner: handoffError ? "UNKNOWN" : evaluateHandoffRuntime({ status: byPhone.get(lead.phone)?.status }).owner
+        }));
+        return res.status(200).json({ ok: true, data: enriched });
       }
 
       if (req.query.debug === "messages") {
@@ -202,6 +215,14 @@ export default async function handler(req, res) {
 
       // release-ai
       if (dashboardAction === "release-ai") {
+        if (isPilotAuthorized(phone)) {
+          const lifecycle = await releaseHandoffToAi(phone);
+          if (!lifecycle.ok) {
+            console.error("DASHBOARD RELEASE-AI HANDOFF ERROR:", lifecycle.error);
+            return res.status(409).json({ ok: false, error: lifecycle.error });
+          }
+          return res.status(200).json({ ok: true, action: "release-ai", phone, handoffStatus: HANDOFF_STATUS.RESOLVED });
+        }
         const { error: releaseAiError } = await atualizarLeadPorTelefone(phone, {
           stage: "novo",
           updated_at: new Date().toISOString()
@@ -217,6 +238,14 @@ export default async function handler(req, res) {
 
       // takeover
       if (dashboardAction === "takeover") {
+        if (isPilotAuthorized(phone)) {
+          const lifecycle = await takeoverHandoff(phone);
+          if (!lifecycle.ok) {
+            console.error("DASHBOARD TAKEOVER HANDOFF ERROR:", lifecycle.error);
+            return res.status(409).json({ ok: false, error: lifecycle.error });
+          }
+          return res.status(200).json({ ok: true, action: "takeover", phone, handoffStatus: HANDOFF_STATUS.TAKEN_OVER });
+        }
         const { error: leadError } = await atualizarLeadPorTelefone(phone, {
           stage: "humano",
           updated_at: new Date().toISOString()
@@ -260,6 +289,11 @@ export default async function handler(req, res) {
     const { data: existingLead, error: existingLeadError } = await buscarLeadPorTelefone(phone);
     if (existingLeadError) {
       console.error("SUPABASE EXISTING LEAD ERROR:", existingLeadError);
+    }
+
+    const pilotHandoff = pilotEnabled ? await buscarHandoffAtivo(phone) : { data: null, error: null };
+    if (pilotHandoff.error) {
+      console.error("[PILOT] HANDOFF STATE READ FAILED", { error: pilotHandoff.error?.name || "HandoffReadError" });
     }
 
     if (existingLead?.stage === "humano") {
@@ -311,6 +345,38 @@ export default async function handler(req, res) {
         const imageFallback = prepararFallbackImagemReferencia();
         userText = imageFallback.userText;
         userContent = imageFallback.userContent;
+      }
+    }
+
+    if (pilotEnabled && (pilotHandoff.data || pilotHandoff.error)) {
+      const runtime = pilotHandoff.error
+        ? { action: "STATE_UNAVAILABLE", shouldCallLlm: false, shouldReply: false }
+        : evaluateHandoffRuntime({ status: pilotHandoff.data.status, text: userText });
+
+      if (runtime.action === "RESOLVE_AND_CONTINUE") {
+        const resolved = await resolveNotifiedHandoff(phone);
+        if (!resolved.ok) {
+          console.error("[PILOT] HANDOFF RESOLVE FAILED", { error: resolved.error });
+          runtime.action = "STATE_UNAVAILABLE";
+          runtime.shouldCallLlm = false;
+        }
+      }
+
+      if (!runtime.shouldCallLlm) {
+        const userMessagePayload = { phone, role: "user", content: userText };
+        if (mediaUrl) {
+          userMessagePayload.media_url = mediaUrl;
+          userMessagePayload.media_type = mediaType;
+        }
+        await inserirMensagem(userMessagePayload);
+        await atualizarLeadPorTelefone(phone, { last_message: userText, updated_at: new Date().toISOString() });
+
+        if (runtime.shouldReply) {
+          const holdReply = buildHoldReply(existingLead?.name);
+          await inserirMensagem({ phone, role: "assistant", content: holdReply });
+          await enviarWhatsApp(phone, holdReply);
+        }
+        return res.status(200).send(runtime.action === "HUMAN_ACTIVE" ? "handoff_humano" : "handoff_hold");
       }
     }
 
