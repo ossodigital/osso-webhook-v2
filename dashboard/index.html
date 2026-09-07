@@ -573,35 +573,6 @@
   </div>
 </header>
 
-<div id="loginScreen" class="login-screen">
-
-  <div class="login-card">
-
-    <h2>💀 Tattoo Até os Ossos CRM</h2>
-
-    <div style="margin-top:-4px; margin-bottom:18px; color:#00ff88; font-size:14px;">
-      Atendimento Inteligente
-    </div>
-
-    <p>
-      Digite a senha do painel para entrar.
-      Ela ficará salva neste navegador.
-    </p>
-
-    <input
-      id="loginToken"
-      type="password"
-      placeholder="Senha do dashboard"
-    >
-
-    <button onclick="login()">
-      Entrar no painel
-    </button>
-
-  </div>
-
-</div>
-
 <div id="app" class="layout">
 
   <aside class="sidebar">
@@ -744,25 +715,17 @@
   </div>
 </div>
 
+<script src="/auth/supabase-auth.js"></script>
 <script>
 
 const API =
-  "https://osso-webhookosso-webhook-2.vercel.app/api/meta";
-
-let TOKEN =
-  localStorage.getItem("osso_dashboard_token") || "";
+  "/api/dashboard";
 
 const statusBox =
   document.getElementById("status");
 
 const app =
   document.getElementById("app");
-
-const loginScreen =
-  document.getElementById("loginScreen");
-
-const loginToken =
-  document.getElementById("loginToken");
 
 const logoutBtn =
   document.getElementById("logoutBtn");
@@ -861,102 +824,19 @@ document.addEventListener("keydown", function(event) {
   }
 });
 
-function mostrarLogin() {
-
-  app.style.display = "none";
-
-  loginScreen.style.display = "flex";
-
-  logoutBtn.style.display = "none";
-
-  statusBox.innerHTML = "";
-}
-
 function mostrarApp() {
-
-  loginScreen.style.display = "none";
-
   app.style.display = "grid";
-
   logoutBtn.style.display = "inline-block";
 }
 
-async function login() {
-
-  const senha =
-    loginToken.value.trim();
-
-  if (!senha) {
-
-    alert("Digite a senha.");
-
-    return;
-  }
-
-  TOKEN = senha;
-
-  try {
-
-    const res = await fetch(
-      API + "?debug=ping&token=" + encodeURIComponent(TOKEN)
-    );
-
-    const data =
-      await res.json();
-
-    if (!res.ok || !data.ok) {
-
-      alert("Senha inválida.");
-
-      return;
-    }
-
-    localStorage.setItem(
-      "osso_dashboard_token",
-      TOKEN
-    );
-
-    mostrarApp();
-
-    iniciarDashboard();
-
-  } catch (err) {
-
-    console.error(err);
-
-    alert("Erro ao conectar.");
-  }
-}
-
-function logout() {
-
-  localStorage.removeItem(
-    "osso_dashboard_token"
-  );
-
-  TOKEN = "";
-
+async function logout() {
   selectedPhone = null;
-
   if (intervalo) {
-
     clearInterval(intervalo);
-
     intervalo = null;
   }
-
-  mostrarLogin();
+  await window.ossoAuth.signOut();
 }
-
-loginToken.addEventListener(
-  "keydown",
-  function(event) {
-
-    if (event.key === "Enter") {
-      login();
-    }
-  }
-);
 
 function escaparHTML(valor) {
 
@@ -1079,8 +959,8 @@ function renderLeads() {
 
 async function carregarLeads() {
 
-  const res = await fetch(
-    API + "?debug=leads&token=" + encodeURIComponent(TOKEN)
+  const res = await window.ossoAuth.authorizedFetch(
+    API + "?debug=leads"
   );
 
   const data =
@@ -1088,16 +968,7 @@ async function carregarLeads() {
 
   if (!res.ok || !data.ok) {
 
-    statusBox.innerHTML =
-      "🔒 Token inválido";
-
-    localStorage.removeItem(
-      "osso_dashboard_token"
-    );
-
-    TOKEN = "";
-
-    mostrarLogin();
+    statusBox.innerHTML = "🔒 Sessão inválida";
 
     return;
   }
@@ -1168,11 +1039,10 @@ async function carregarConversa(phone, forceScroll = false) {
   const url =
     API
     + "?debug=messages-by-phone"
-    + "&phone=" + encodeURIComponent(phone)
-    + "&token=" + encodeURIComponent(TOKEN);
+    + "&phone=" + encodeURIComponent(phone);
 
   const res =
-    await fetch(url);
+    await window.ossoAuth.authorizedFetch(url);
 
   const data =
     await res.json();
@@ -1279,7 +1149,7 @@ async function enviarMensagemManual() {
 
   try {
 
-    const res = await fetch(
+    const res = await window.ossoAuth.authorizedFetch(
       API + "?debug=send-message",
       {
         method: "POST",
@@ -1287,7 +1157,6 @@ async function enviarMensagemManual() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          token: TOKEN,
           phone: selectedPhone,
           message: mensagem
         })
@@ -1346,7 +1215,7 @@ async function ativarHumano() {
 
   try {
 
-    const res = await fetch(
+    const res = await window.ossoAuth.authorizedFetch(
       API + "?debug=takeover",
       {
         method: "POST",
@@ -1354,7 +1223,6 @@ async function ativarHumano() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          token: TOKEN,
           phone: selectedPhone
         })
       }
@@ -1417,7 +1285,7 @@ async function voltarIA() {
 
   try {
 
-    const res = await fetch(
+    const res = await window.ossoAuth.authorizedFetch(
       API + "?debug=release-ai",
       {
         method: "POST",
@@ -1425,7 +1293,6 @@ async function voltarIA() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          token: TOKEN,
           phone: selectedPhone
         })
       }
@@ -1493,14 +1360,6 @@ filtroStage.addEventListener(
 );
 
 function iniciarDashboard() {
-
-  if (!TOKEN) {
-
-    mostrarLogin();
-
-    return;
-  }
-
   carregarLeads();
 
   if (intervalo) {
@@ -1508,9 +1367,6 @@ function iniciarDashboard() {
   }
 
   intervalo = setInterval(() => {
-
-    if (!TOKEN) return;
-
     carregarLeads();
 
     if (selectedPhone) {
@@ -1527,11 +1383,14 @@ function ownershipPresentation(lead) {
   return { css: "ai", label: "IA ativa" };
 }
 
-if (TOKEN) {
+window.ossoAuth.getSession().then(session => {
+  if (!session) {
+    location.replace("/login");
+    return;
+  }
+  mostrarApp();
   iniciarDashboard();
-} else {
-  mostrarLogin();
-}
+});
 
 </script>
 
