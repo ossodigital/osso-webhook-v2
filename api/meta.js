@@ -444,7 +444,7 @@ export default async function handler(req, res) {
     // mesma checagem) assume a resposta, evitando respostas duplicadas/contraditorias
     // quando o cliente manda varias mensagens seguidas rapidamente.
     if (insertedUserMsg?.created_at) {
-      await new Promise((resolve) => setTimeout(resolve, 2500));
+      await new Promise((resolve) => setTimeout(resolve, 3000));
       const { data: newerMessages, error: newerMsgError } = await buscarMensagensMaisRecentesQue(
         phone,
         insertedUserMsg.created_at

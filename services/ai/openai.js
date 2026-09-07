@@ -101,7 +101,16 @@ export async function transcreverAudio(mediaId, preloadedMediaUrl = null) {
   if (!transcriptionRes.ok) {
     throw new Error(`Transcription error: ${JSON.stringify(result)}`);
   }
-  let text = result?.text?.trim() || "quero fazer uma tatuagem";
+  let text = result?.text?.trim();
+  if (!text) {
+    // Whisper respondeu OK mas sem texto (audio silencioso, ruido, curto demais).
+    // Antes isso virava um texto inventado ("quero fazer uma tatuagem"), fazendo o
+    // agente responder como se o cliente tivesse dito algo que ele nao disse. Agora
+    // isso conta como falha de transcricao de verdade, e quem chama (api/meta.js)
+    // trata como erro: tenta de novo e, se continuar vazio, avisa o cliente para
+    // escrever ou reenviar o audio, em vez de inventar uma resposta.
+    throw new Error(`Transcrição vazia: ${JSON.stringify(result)}`);
+  }
   if (text.length > 700) {
     text = text.slice(0, 700);
   }
