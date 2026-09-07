@@ -31,6 +31,7 @@ import {
   upsertLead
 } from "../services/supabase/leadsRepository.js";
 import {
+  buscarMensagensMaisRecentesQue,
   inserirMensagem,
   listarMensagensPorTelefone,
   listarMensagensRecentes
@@ -323,12 +324,12 @@ export default async function handler(req, res) {
         console.error("ERRO MEDIA URL ÁUDIO:", err);
       }
       try {
-        userText = await transcreverAudio(msg.audio.id);
+        userText = await transcreverAudio(msg.audio.id, mediaUrl);
         userContent = [{ type: "text", text: userText }];
       } catch (err) {
         console.error("ERRO TRANSCRIÇÃO (tentativa 1):", err);
         try {
-          userText = await transcreverAudio(msg.audio.id);
+          userText = await transcreverAudio(msg.audio.id, mediaUrl);
           userContent = [{ type: "text", text: userText }];
         } catch (retryErr) {
           console.error("ERRO TRANSCRIÇÃO (tentativa 2, desistindo):", retryErr);
@@ -434,8 +435,26 @@ export default async function handler(req, res) {
       userMessagePayload.media_type = mediaType;
     }
 
-    const { error: userMsgError } = await inserirMensagem(userMessagePayload);
+    const { data: insertedUserMsg, error: userMsgError } = await inserirMensagem(userMessagePayload);
     if (userMsgError) console.error("SUPABASE USER MSG ERROR:", userMsgError);
+
+    // Guarda de concorrencia + atraso humanizado: espera um pouco e reconfere se
+    // chegou uma mensagem mais nova do mesmo telefone nesse meio-tempo. Se chegou,
+    // esta invocacao encerra sem responder - a invocacao mais nova (que roda essa
+    // mesma checagem) assume a resposta, evitando respostas duplicadas/contraditorias
+    // quando o cliente manda varias mensagens seguidas rapidamente.
+    if (insertedUserMsg?.created_at) {
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      const { data: newerMessages, error: newerMsgError } = await buscarMensagensMaisRecentesQue(
+        phone,
+        insertedUserMsg.created_at
+      );
+      if (newerMsgError) console.error("SUPABASE NEWER MSG CHECK ERROR:", newerMsgError);
+      if (newerMessages && newerMessages.length > 0) {
+        console.log(`DEBOUNCE: mensagem mais nova de ${phone} chegou durante a espera, encerrando esta invocacao sem responder.`);
+        return res.status(200).send("ok");
+      }
+    }
 
     if (!leadName) {
       const nameReply = "Claro! Antes de continuar, como posso te chamar? 😊";

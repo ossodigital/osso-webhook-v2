@@ -58,16 +58,20 @@ export async function gerarRespostaAtendimento({
   return reply;
 }
 
-export async function transcreverAudio(mediaId) {
-  const mediaRes = await fetch(`https://graph.facebook.com/v19.0/${mediaId}`, {
-    headers: { Authorization: `Bearer ${env.WHATSAPP_TOKEN}` }
-  });
-  const mediaData = await mediaRes.json();
-  console.log("WHATSAPP AUDIO MEDIA DATA:", mediaData);
-  if (!mediaRes.ok || !mediaData?.url) {
-    throw new Error(`Falha ao obter mídia do áudio: ${JSON.stringify(mediaData)}`);
+export async function transcreverAudio(mediaId, preloadedMediaUrl = null) {
+  let mediaUrl = preloadedMediaUrl;
+  if (!mediaUrl) {
+    const mediaRes = await fetch(`https://graph.facebook.com/v19.0/${mediaId}`, {
+      headers: { Authorization: `Bearer ${env.WHATSAPP_TOKEN}` }
+    });
+    const mediaData = await mediaRes.json();
+    console.log("WHATSAPP AUDIO MEDIA DATA:", mediaData);
+    if (!mediaRes.ok || !mediaData?.url) {
+      throw new Error(`Falha ao obter mídia do áudio: ${JSON.stringify(mediaData)}`);
+    }
+    mediaUrl = mediaData.url;
   }
-  const audioRes = await fetch(mediaData.url, {
+  const audioRes = await fetch(mediaUrl, {
     headers: { Authorization: `Bearer ${env.WHATSAPP_TOKEN}` }
   });
   if (!audioRes.ok) throw new Error("Falha ao baixar áudio");

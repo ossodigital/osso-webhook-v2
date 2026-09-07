@@ -3,7 +3,19 @@ import { supabase } from "./client.js";
 export async function inserirMensagem(messagePayload) {
   return await supabase
     .from("messages")
-    .insert(messagePayload);
+    .insert(messagePayload)
+    .select()
+    .single();
+}
+
+export async function buscarMensagensMaisRecentesQue(phone, createdAtIso) {
+  return await supabase
+    .from("messages")
+    .select("*")
+    .eq("phone", phone)
+    .eq("role", "user")
+    .gt("created_at", createdAtIso)
+    .order("created_at", { ascending: false });
 }
 
 export async function listarMensagensRecentes(limit = 80) {
