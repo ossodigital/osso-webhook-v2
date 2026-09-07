@@ -326,9 +326,17 @@ export default async function handler(req, res) {
         userText = await transcreverAudio(msg.audio.id);
         userContent = [{ type: "text", text: userText }];
       } catch (err) {
-        console.error("ERRO TRANSCRIÇÃO:", err);
-        userText = "quero fazer uma tatuagem";
-        userContent = [{ type: "text", text: userText }];
+        console.error("ERRO TRANSCRIÇÃO (tentativa 1):", err);
+        try {
+          userText = await transcreverAudio(msg.audio.id);
+          userContent = [{ type: "text", text: userText }];
+        } catch (retryErr) {
+          console.error("ERRO TRANSCRIÇÃO (tentativa 2, desistindo):", retryErr);
+          const audioFallbackReply = "Não consegui entender seu áudio agora 🙏 Pode escrever a mensagem ou tentar mandar o áudio de novo?";
+          await inserirMensagem({ phone, role: "assistant", content: audioFallbackReply });
+          await enviarWhatsApp(phone, audioFallbackReply);
+          return res.status(200).send("ok");
+        }
       }
     } else if (msg.image?.id) {
       try {
@@ -336,7 +344,12 @@ export default async function handler(req, res) {
         mediaType = "image";
         const buffer = await downloadMedia(mediaUrl);
         const urlPublica = await uploadImagemLead(buffer, phone);
-        if (urlPublica) mediaUrl = urlPublica;
+        if (urlPublica) {
+          mediaUrl = urlPublica;
+        } else {
+          console.error("ERRO UPLOAD SUPABASE STORAGE — mediaUrl temporario da Meta nao sera salvo (evita container quebrado no dashboard)");
+          mediaUrl = null;
+        }
         const imageContent = prepararConteudoImagemReferencia(buffer);
         userText = imageContent.userText;
         userContent = imageContent.userContent;
@@ -507,7 +520,11 @@ export default async function handler(req, res) {
     }
 
     if (!pilotEnabled && effectiveStage === "humano" && existingLead?.stage !== "humano") {
-      await alertarAdminLeadHumano({ leadName, phone, userText, stage: effectiveStage });
+      const adminResults = await alertarAdminLeadHumano({ leadName, phone, userText, stage: effectiveStage });
+      const adminErrors = (adminResults || []).filter((r) => !r.ok);
+      if (adminErrors.length) {
+        console.error("WEBHOOK ADMIN ALERT ERROR:", adminErrors);
+      }
     }
 
     await inserirMensagem({ phone, role: "assistant", content: reply });
