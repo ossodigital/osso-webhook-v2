@@ -29,6 +29,12 @@ export const env = {
   get SUPABASE_KEY() {
     return process.env.SUPABASE_KEY;
   },
+  get SUPABASE_ANON_KEY() {
+    return process.env.SUPABASE_ANON_KEY;
+  },
+  get SUPABASE_SERVICE_ROLE_KEY() {
+    return process.env.SUPABASE_SERVICE_ROLE_KEY;
+  },
   get SUPABASE_URL() {
     return process.env.SUPABASE_URL;
   },

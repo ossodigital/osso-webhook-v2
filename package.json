@@ -2,8 +2,13 @@
   "name": "osso-webhook",
   "version": "1.0.0",
   "type": "module",
+  "scripts": {
+    "check": "node --check api/meta.js && node --check api/dashboard.js && node --check api/auth-config.js && node --check services/auth/dashboardAuth.js && node --check middleware.js && node --check auth/supabase-auth.js && node --check login/login.js",
+    "create-admin": "node scripts/create-admin.js"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.0",
+    "@vercel/functions": "^2.2.13",
     "form-data": "^4.0.5",
     "node-fetch": "^3.3.2"
   }

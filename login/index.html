@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>OSSO Dashboard CRM — Login</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#090b0d;color:#fff;font-family:Arial,sans-serif}.login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}.login-card{width:100%;max-width:390px;background:#111519;border:1px solid #293138;border-radius:18px;padding:32px;box-shadow:0 20px 60px #0008}.login-card h2{margin:0 0 8px}.brand{color:#00ff88;font-size:14px;margin-bottom:22px}.login-card p{color:#9ba6ad;line-height:1.5}.login-card label{display:block;margin:16px 0 7px;color:#c9d0d4;font-size:14px}.login-card input{width:100%;padding:14px;border-radius:10px;border:1px solid #303942;background:#090b0d;color:#fff;font-size:16px}.login-card button{width:100%;margin-top:20px;padding:14px;border:0;border-radius:10px;background:#00ff88;color:#06110b;font-weight:700;font-size:15px;cursor:pointer}.link{display:block;margin-top:16px;text-align:center;color:#00ff88;background:none!important;padding:0!important;font-weight:400!important}.message{min-height:20px;margin-top:15px;color:#ff7f7f;font-size:14px}.hidden{display:none}.success{color:#00ff88}
+  </style>
+</head>
+<body>
+<main class="login-screen"><section class="login-card">
+  <h2>💀 Tattoo Até os Ossos CRM</h2><div class="brand">Atendimento Inteligente</div>
+  <form id="loginForm">
+    <p>Entre com seu e-mail e senha para acessar o painel.</p>
+    <label for="email">E-mail</label><input id="email" type="email" autocomplete="email" required>
+    <label for="password">Senha</label><input id="password" type="password" autocomplete="current-password" required>
+    <button type="submit">Entrar no painel</button>
+    <button class="link" id="forgotButton" type="button">Esqueci minha senha</button>
+  </form>
+  <form id="recoveryForm" class="hidden">
+    <p>Informe seu e-mail para receber o link de recuperação.</p>
+    <label for="recoveryEmail">E-mail</label><input id="recoveryEmail" type="email" autocomplete="email" required>
+    <button type="submit">Enviar recuperação</button>
+    <button class="link" id="backButton" type="button">Voltar ao login</button>
+  </form>
+  <form id="passwordForm" class="hidden">
+    <p>Defina uma nova senha para sua conta.</p>
+    <label for="newPassword">Nova senha</label><input id="newPassword" type="password" autocomplete="new-password" minlength="8" required>
+    <button type="submit">Atualizar senha</button>
+  </form>
+  <div id="message" class="message" role="status"></div>
+</section></main>
+<script src="/auth/supabase-auth.js"></script>
+<script type="module" src="/login/login.js"></script>
+</body></html>
