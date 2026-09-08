@@ -9,6 +9,12 @@ function readCookie(request, name) {
 
 export default async function middleware(request) {
   const loginUrl = new URL("/login", request.url);
+  const { pathname } = new URL(request.url);
+
+  // raiz do dominio (crm.tattooateosossos.com.br) nao tinha pagina propria e caia em 404;
+  // agora manda direto pra tela de login (que ja redireciona pro dashboard se a sessao for valida)
+  if (pathname === "/") return Response.redirect(loginUrl, 307);
+
   const token = readCookie(request, ACCESS_COOKIE);
   if (!token || !process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) return Response.redirect(loginUrl, 307);
 
@@ -19,4 +25,4 @@ export default async function middleware(request) {
   return next();
 }
 
-export const config = { matcher: ["/dashboard", "/dashboard/:path*"] };
+export const config = { matcher: ["/", "/dashboard", "/dashboard/:path*"] };
