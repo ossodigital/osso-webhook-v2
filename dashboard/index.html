@@ -497,23 +497,51 @@
       font-size: 18px;
     }
 
+    .back-to-leads {
+      display: none;
+    }
+
     @media (max-width: 900px) {
 
       .layout {
         grid-template-columns: 1fr;
-        grid-template-rows: minmax(150px, 38%) minmax(0, 1fr);
+        grid-template-rows: 1fr;
       }
 
       .sidebar {
-        height: auto;
+        height: 100%;
         min-height: 0;
         border-right: 0;
-        border-bottom: 1px solid #222;
+        border-bottom: 0;
       }
 
       .chat-area {
-        height: auto;
+        display: none;
+        height: 100%;
         min-height: 0;
+      }
+
+      .layout.chat-open .sidebar {
+        display: none;
+      }
+
+      .layout.chat-open .chat-area {
+        display: flex;
+      }
+
+      .back-to-leads {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #1a1a1a;
+        color: #eee;
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 8px 12px;
+        margin-bottom: 8px;
+        font-size: 14px;
+        min-height: 40px;
+        cursor: pointer;
       }
 
       .chat-buttons {
@@ -632,6 +660,10 @@
   <main class="chat-area">
 
     <div class="chat-header">
+
+      <button type="button" class="back-to-leads" onclick="voltarParaListaMobile()">
+        ← Leads
+      </button>
 
       <div id="chatTitle" class="chat-title">
         Selecione um lead
@@ -1031,7 +1063,13 @@ async function selecionarLead(phone) {
 
   renderLeads();
 
+  app.classList.add("chat-open");
+
   await carregarConversa(phone, true);
+}
+
+function voltarParaListaMobile() {
+  app.classList.remove("chat-open");
 }
 
 async function carregarConversa(phone, forceScroll = false) {
