@@ -11,9 +11,10 @@ export async function listarLeadsParaRelatorio(diasAtras = 30) {
   const desde = new Date(Date.now() - diasAtras * 24 * 60 * 60 * 1000).toISOString();
   return await supabase
     .from("leads")
-    .select("stage, created_at")
+    .select("phone, name, stage, last_message, created_at, updated_at")
     .is("deleted_at", null)
-    .gte("created_at", desde);
+    .gte("created_at", desde)
+    .order("updated_at", { ascending: false });
 }
 
 export async function listarMensagensParaTempoResposta(diasAtras = 30) {

@@ -164,15 +164,22 @@ export default async function handler(req, res) {
           return res.status(403).json({ ok: false, error: "Acesso negado" });
         }
 
+        const PERIODOS_PERMITIDOS = [7, 30, 90];
+        const diasAtras = PERIODOS_PERMITIDOS.includes(Number(req.query.dias))
+          ? Number(req.query.dias)
+          : 30;
+
         const [totalResult, leadsResult, mensagensResult] = await Promise.all([
           contarLeadsTotal(),
-          listarLeadsParaRelatorio(30),
-          listarMensagensParaTempoResposta(30)
+          listarLeadsParaRelatorio(diasAtras),
+          listarMensagensParaTempoResposta(diasAtras)
         ]);
 
         if (totalResult.error) return res.status(500).json({ ok: false, error: totalResult.error.message });
         if (leadsResult.error) return res.status(500).json({ ok: false, error: leadsResult.error.message });
         if (mensagensResult.error) return res.status(500).json({ ok: false, error: mensagensResult.error.message });
+
+        const leads = leadsResult.data || [];
 
         const STAGES_CONHECIDOS = [
           "humano", "quente", "agendamento", "orcamento", "novo",
@@ -186,7 +193,7 @@ export default async function handler(req, res) {
         let leadsHoje = 0;
         const porDia = new Map();
 
-        for (const lead of leadsResult.data || []) {
+        for (const lead of leads) {
           const stageKey = porStage.hasOwnProperty(lead.stage) ? lead.stage : "novo";
           porStage[stageKey] += 1;
 
@@ -198,7 +205,7 @@ export default async function handler(req, res) {
         }
 
         const serieDiaria = [];
-        for (let i = 29; i >= 0; i--) {
+        for (let i = diasAtras - 1; i >= 0; i--) {
           const dia = new Date();
           dia.setDate(dia.getDate() - i);
           const diaKey = dia.toISOString().slice(0, 10);
@@ -226,15 +233,90 @@ export default async function handler(req, res) {
           ? Math.round((temposResposta.reduce((a, b) => a + b, 0) / temposResposta.length / 60000) * 10) / 10
           : null;
 
+        // ─── Funil de estágios (situação atual, não é histórico de transições) ──
+        const FUNIL_GRUPOS = [
+          { chave: "novo", label: "Novo", stages: ["novo", "captando_nome"] },
+          { chave: "interesse", label: "Interesse", stages: ["curioso", "orcamento"] },
+          { chave: "quente", label: "Quente", stages: ["quente"] },
+          { chave: "agendamento", label: "Agendamento", stages: ["agendamento"] },
+          { chave: "humano", label: "Humano", stages: ["humano"] },
+          { chave: "encerrado", label: "Encerrado", stages: ["encerrado"] }
+        ];
+        const funil = FUNIL_GRUPOS.map((grupo) => ({
+          chave: grupo.chave,
+          label: grupo.label,
+          total: grupo.stages.reduce((soma, stage) => soma + (porStage[stage] || 0), 0)
+        }));
+        const reengajamento = (porStage.followup_1 || 0) + (porStage.followup_2 || 0);
+
+        // ─── Ranking dos leads mais quentes (situação atual, no período) ────────
+        const PRIORIDADE_STAGE = {
+          quente: 6, agendamento: 5, humano: 5, orcamento: 3,
+          curioso: 2, followup_1: 2, followup_2: 1.5, novo: 1, captando_nome: 1, encerrado: 0
+        };
+        const rankingQuentes = leads
+          .filter((lead) => lead.stage !== "encerrado")
+          .map((lead) => ({
+            phone: lead.phone,
+            name: lead.name || null,
+            stage: lead.stage,
+            lastMessage: lead.last_message || null,
+            updatedAt: lead.updated_at
+          }))
+          .sort((a, b) => {
+            const prioridadeDiff = (PRIORIDADE_STAGE[b.stage] || 0) - (PRIORIDADE_STAGE[a.stage] || 0);
+            if (prioridadeDiff !== 0) return prioridadeDiff;
+            return new Date(b.updatedAt) - new Date(a.updatedAt);
+          })
+          .slice(0, 8);
+
+        // ─── IA vs atendimento humano ────────────────────────────────────────
+        const phonesDoPeriodo = leads.map((lead) => lead.phone).filter(Boolean);
+        const { data: handoffsPeriodo, error: handoffsPeriodoError } =
+          await listarHandoffsAtivosPorTelefones(phonesDoPeriodo);
+        const handoffByPhone = handoffsPeriodoError
+          ? new Map()
+          : new Map((handoffsPeriodo || []).map((h) => [h.phone, h]));
+
+        const STAGES_AVANCADOS = new Set(["quente", "agendamento", "humano", "encerrado"]);
+        const iaVsHumano = {
+          ia: { total: 0, avancados: 0 },
+          humano: { total: 0, avancados: 0 }
+        };
+        for (const lead of leads) {
+          const handoffStatus = handoffByPhone.get(lead.phone)?.status || HANDOFF_STATUS.NONE;
+          const owner = evaluateHandoffRuntime({ status: handoffStatus }).owner;
+          const donoHumano = owner === "HUMAN" || owner === "HUMAN_PENDING" || lead.stage === "humano";
+          const grupo = donoHumano ? iaVsHumano.humano : iaVsHumano.ia;
+          grupo.total += 1;
+          if (STAGES_AVANCADOS.has(lead.stage)) grupo.avancados += 1;
+        }
+
+        // ─── Export CSV (mesmo período) ──────────────────────────────────────
+        const leadsParaExport = leads.slice(0, 1000).map((lead) => ({
+          phone: lead.phone,
+          name: lead.name || "",
+          stage: lead.stage,
+          lastMessage: lead.last_message || "",
+          createdAt: lead.created_at,
+          updatedAt: lead.updated_at
+        }));
+
         return res.status(200).json({
           ok: true,
           data: {
+            periodoDias: diasAtras,
             totalLeads: totalResult.count || 0,
             leadsHoje,
             porStage,
             serieDiaria,
             tempoRespostaMedioMin,
-            amostraTempoResposta: temposResposta.length
+            amostraTempoResposta: temposResposta.length,
+            funil,
+            reengajamento,
+            rankingQuentes,
+            iaVsHumano,
+            leadsParaExport
           }
         });
       }

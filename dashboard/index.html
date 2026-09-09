@@ -618,6 +618,178 @@
       margin-top: 60px;
     }
 
+    .reports-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .period-tabs {
+      display: flex;
+      gap: 6px;
+    }
+
+    .period-tab {
+      background: #171717;
+      border: 1px solid #2a2a2a;
+      color: #aaa;
+      padding: 7px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: bold;
+      font-family: inherit;
+    }
+
+    .period-tab:hover {
+      background: #1e1e1e;
+      color: #fff;
+    }
+
+    .period-tab.active {
+      background: #00ff88;
+      color: #000;
+      border-color: #00ff88;
+    }
+
+    .export-btn {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #eee;
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: bold;
+      font-family: inherit;
+    }
+
+    .export-btn:hover {
+      background: #242424;
+    }
+
+    .reports-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .funnel-row {
+      display: grid;
+      grid-template-columns: 100px 1fr 42px;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-size: 13px;
+      color: #ddd;
+    }
+
+    .funnel-track {
+      background: #111;
+      border-radius: 8px;
+      height: 24px;
+      overflow: hidden;
+    }
+
+    .funnel-fill {
+      height: 100%;
+      border-radius: 8px;
+      background: linear-gradient(90deg, #00ff88, #00bfff);
+      min-width: 4px;
+    }
+
+    .reengajamento-note {
+      color: #888;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    .hot-lead-card {
+      background: #171717;
+      border: 1px solid #222;
+      border-left: 4px solid #00ff88;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+
+    .hot-lead-card:hover {
+      background: #1e1e1e;
+    }
+
+    .hot-lead-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .hot-lead-name {
+      font-weight: bold;
+      color: #fff;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .hot-lead-message {
+      color: #999;
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .owner-compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .owner-card {
+      background: #111;
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .owner-card strong {
+      display: block;
+      font-size: 26px;
+      margin-bottom: 4px;
+    }
+
+    .owner-card.ia strong {
+      color: #00bfff;
+    }
+
+    .owner-card.humano strong {
+      color: #ff3b3b;
+    }
+
+    .owner-card span {
+      color: #aaa;
+      font-size: 12px;
+      display: block;
+    }
+
+    .owner-card .owner-rate {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #ddd;
+    }
+
+    @media (max-width: 1100px) {
+      .reports-columns {
+        grid-template-columns: 1fr;
+      }
+    }
+
     @media (max-width: 900px) {
 
       .layout {
@@ -703,6 +875,15 @@
 
       .reports-view {
         padding: 14px;
+      }
+
+      .reports-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .owner-compare {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -869,6 +1050,16 @@
 </div>
 
 <div id="reportsView" class="reports-view">
+
+  <div class="reports-toolbar">
+    <div class="period-tabs">
+      <button type="button" class="period-tab" data-dias="7" onclick="mudarPeriodoRelatorio(7)">7 dias</button>
+      <button type="button" class="period-tab active" data-dias="30" onclick="mudarPeriodoRelatorio(30)">30 dias</button>
+      <button type="button" class="period-tab" data-dias="90" onclick="mudarPeriodoRelatorio(90)">90 dias</button>
+    </div>
+    <button type="button" class="export-btn" onclick="exportarLeadsCSV()">⬇ Exportar CSV</button>
+  </div>
+
   <div id="reportsContent">
     <div class="reports-empty">Carregando relatórios...</div>
   </div>
@@ -958,6 +1149,8 @@ const reportsContent =
 
 let leadsCache = [];
 let reportsIntervalo = null;
+let relatoriosPeriodoAtual = 30;
+let relatoriosUltimoResultado = null;
 let selectedPhone = null;
 let lastMessageCount = 0;
 let intervalo = null;
@@ -1655,7 +1848,7 @@ async function carregarRelatorios() {
   reportsContent.innerHTML = '<div class="reports-empty">Carregando relatórios...</div>';
 
   const res = await window.ossoAuth.authorizedFetch(
-    API + "?debug=stats"
+    API + "?debug=stats&dias=" + relatoriosPeriodoAtual
   );
 
   const data =
@@ -1667,6 +1860,7 @@ async function carregarRelatorios() {
   }
 
   const s = data.data;
+  relatoriosUltimoResultado = s;
 
   const totalStage =
     Object.values(s.porStage).reduce((a, b) => a + b, 0) || 1;
@@ -1681,26 +1875,152 @@ async function carregarRelatorios() {
       Math.round((qtd / totalStage) * 100) + '%"></div></div>' +
       '<span style="text-align:right;">' + qtd + '</span>' +
       '</div>'
-    )).join("") || '<div class="reports-empty">Sem leads nos últimos 30 dias.</div>';
+    )).join("") || '<div class="reports-empty">Sem leads no período.</div>';
 
   const tempoResposta =
     s.tempoRespostaMedioMin != null ? s.tempoRespostaMedioMin + " min" : "—";
 
   reportsContent.innerHTML =
     '<div class="reports-grid">' +
-    '<div class="report-card"><strong>' + s.totalLeads + '</strong><span>Total de leads</span></div>' +
+    '<div class="report-card"><strong>' + s.totalLeads + '</strong><span>Total de leads (geral)</span></div>' +
     '<div class="report-card"><strong>' + s.leadsHoje + '</strong><span>Novos hoje</span></div>' +
     '<div class="report-card"><strong>' + tempoResposta + '</strong><span>Tempo médio de resposta (IA)</span></div>' +
     '<div class="report-card"><strong>' + (s.porStage.humano || 0) + '</strong><span>Em atendimento humano</span></div>' +
     '</div>' +
     '<div class="report-panel">' +
-    '<h3>Leads novos — últimos 30 dias</h3>' +
+    '<h3>Leads novos — últimos ' + s.periodoDias + ' dias</h3>' +
     renderGraficoSerie(s.serieDiaria) +
     '</div>' +
+    '<div class="reports-columns">' +
     '<div class="report-panel">' +
-    '<h3>Leads por estágio (últimos 30 dias)</h3>' +
+    '<h3>Funil de estágios (situação atual)</h3>' +
+    renderFunil(s.funil, s.reengajamento) +
+    '</div>' +
+    '<div class="report-panel">' +
+    '<h3>IA vs atendimento humano</h3>' +
+    renderIaVsHumano(s.iaVsHumano) +
+    '</div>' +
+    '</div>' +
+    '<div class="report-panel">' +
+    '<h3>Leads mais quentes agora</h3>' +
+    renderRankingQuentes(s.rankingQuentes) +
+    '</div>' +
+    '<div class="report-panel">' +
+    '<h3>Leads por estágio (no período)</h3>' +
     stageRows +
     '</div>';
+}
+
+function renderFunil(funil, reengajamento) {
+  if (!funil || !funil.length) {
+    return '<div class="reports-empty">Sem leads no período.</div>';
+  }
+
+  const max = Math.max(1, ...funil.map(f => f.total));
+
+  const linhas = funil.map(f => (
+    '<div class="funnel-row">' +
+    '<span>' + escaparHTML(f.label) + '</span>' +
+    '<div class="funnel-track"><div class="funnel-fill" style="width:' +
+    Math.round((f.total / max) * 100) + '%"></div></div>' +
+    '<span style="text-align:right;">' + f.total + '</span>' +
+    '</div>'
+  )).join("");
+
+  const nota = reengajamento > 0
+    ? '<div class="reengajamento-note">+ ' + reengajamento + ' lead(s) em followup de reengajamento (fora do funil principal)</div>'
+    : "";
+
+  return linhas + nota;
+}
+
+function renderRankingQuentes(ranking) {
+  if (!ranking || !ranking.length) {
+    return '<div class="reports-empty">Nenhum lead ativo no período.</div>';
+  }
+
+  return ranking.map(lead => {
+    const nome = lead.name || lead.phone;
+    const mensagem = lead.lastMessage || "Sem mensagem registrada";
+    const telefoneAttr = escaparHTML(lead.phone || "");
+    return (
+      '<div class="hot-lead-card" onclick="abrirLeadDoRelatorio(\'' + telefoneAttr + '\')">' +
+      '<div class="hot-lead-top">' +
+      '<span class="hot-lead-name">' + escaparHTML(nome) + '</span>' +
+      '<span class="lead-stage ' + escaparHTML(lead.stage || "") + '">' +
+      escaparHTML(STAGE_LABELS[lead.stage] || lead.stage || "") + '</span>' +
+      '</div>' +
+      '<div class="hot-lead-message">' + escaparHTML(mensagem) + '</div>' +
+      '</div>'
+    );
+  }).join("");
+}
+
+function renderIaVsHumano(iaVsHumano) {
+  if (!iaVsHumano) {
+    return '<div class="reports-empty">Sem dados no período.</div>';
+  }
+
+  const ia = iaVsHumano.ia || { total: 0, avancados: 0 };
+  const humano = iaVsHumano.humano || { total: 0, avancados: 0 };
+  const taxaIa = ia.total ? Math.round((ia.avancados / ia.total) * 100) : 0;
+  const taxaHumano = humano.total ? Math.round((humano.avancados / humano.total) * 100) : 0;
+
+  return (
+    '<div class="owner-compare">' +
+    '<div class="owner-card ia">' +
+    '<strong>' + ia.total + '</strong>' +
+    '<span>Com a IA agora</span>' +
+    '<div class="owner-rate">' + taxaIa + '% avançados no funil</div>' +
+    '</div>' +
+    '<div class="owner-card humano">' +
+    '<strong>' + humano.total + '</strong>' +
+    '<span>Com atendimento humano</span>' +
+    '<div class="owner-rate">' + taxaHumano + '% avançados no funil</div>' +
+    '</div>' +
+    '</div>'
+  );
+}
+
+function mudarPeriodoRelatorio(dias) {
+  relatoriosPeriodoAtual = dias;
+
+  document.querySelectorAll(".period-tab").forEach(botao => {
+    botao.classList.toggle("active", Number(botao.dataset.dias) === dias);
+  });
+
+  carregarRelatorios();
+}
+
+function abrirLeadDoRelatorio(phone) {
+  alternarView("conversas");
+  selecionarLead(phone);
+}
+
+function exportarLeadsCSV() {
+  const leads = relatoriosUltimoResultado ? relatoriosUltimoResultado.leadsParaExport : null;
+
+  if (!leads || !leads.length) {
+    alert("Nenhum lead para exportar nesse período.");
+    return;
+  }
+
+  const cabecalho = ["telefone", "nome", "estagio", "ultima_mensagem", "criado_em", "atualizado_em"];
+  const linhas = leads.map(lead => [
+    lead.phone, lead.name, lead.stage, lead.lastMessage, lead.createdAt, lead.updatedAt
+  ].map(valor => '"' + String(valor || "").replace(/"/g, '""') + '"').join(","));
+
+  const csv = [cabecalho.join(","), ...linhas].join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "leads_" + relatoriosPeriodoAtual + "dias_" + new Date().toISOString().slice(0, 10) + ".csv";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 window.ossoAuth.getSession().then(session => {
