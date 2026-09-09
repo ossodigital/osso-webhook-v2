@@ -23,7 +23,8 @@ import {
   getAdminPhones,
   testarAdminAlerts
 } from "../services/meta/adminAlerts.js";
-import { enviarWhatsApp } from "../services/meta/whatsapp.js";
+import { enviarWhatsApp, enviarWhatsAppAudio, uploadWhatsAppMedia } from "../services/meta/whatsapp.js";
+import { transcodeParaOggOpus } from "../services/media/audioTranscode.js";
 import {
   atualizarLeadPorTelefone,
   buscarLeadPorTelefone,
@@ -36,8 +37,13 @@ import {
   listarMensagensPorTelefone,
   listarMensagensRecentes
 } from "../services/supabase/messagesRepository.js";
-import { uploadImagemLead } from "../services/supabase/storage.js";
+import { uploadAudioLead, uploadImagemLead } from "../services/supabase/storage.js";
 import { buscarHandoffAtivo, listarHandoffsAtivosPorTelefones } from "../services/supabase/handoffRepository.js";
+import {
+  contarLeadsTotal,
+  listarLeadsParaRelatorio,
+  listarMensagensParaTempoResposta
+} from "../services/supabase/statsRepository.js";
 
 function validarDashboardToken(req) {
   const dashboardToken = env.DASHBOARD_TOKEN;
@@ -153,6 +159,86 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, phone, data });
       }
 
+      if (req.query.debug === "stats") {
+        if (!validarDashboardToken(req)) {
+          return res.status(403).json({ ok: false, error: "Acesso negado" });
+        }
+
+        const [totalResult, leadsResult, mensagensResult] = await Promise.all([
+          contarLeadsTotal(),
+          listarLeadsParaRelatorio(30),
+          listarMensagensParaTempoResposta(30)
+        ]);
+
+        if (totalResult.error) return res.status(500).json({ ok: false, error: totalResult.error.message });
+        if (leadsResult.error) return res.status(500).json({ ok: false, error: leadsResult.error.message });
+        if (mensagensResult.error) return res.status(500).json({ ok: false, error: mensagensResult.error.message });
+
+        const STAGES_CONHECIDOS = [
+          "humano", "quente", "agendamento", "orcamento", "novo",
+          "captando_nome", "encerrado", "followup_1", "followup_2", "curioso"
+        ];
+        const porStage = Object.fromEntries(STAGES_CONHECIDOS.map((stage) => [stage, 0]));
+
+        const hojeInicio = new Date();
+        hojeInicio.setHours(0, 0, 0, 0);
+
+        let leadsHoje = 0;
+        const porDia = new Map();
+
+        for (const lead of leadsResult.data || []) {
+          const stageKey = porStage.hasOwnProperty(lead.stage) ? lead.stage : "novo";
+          porStage[stageKey] += 1;
+
+          const criadoEm = new Date(lead.created_at);
+          if (criadoEm >= hojeInicio) leadsHoje += 1;
+
+          const diaKey = String(lead.created_at).slice(0, 10);
+          porDia.set(diaKey, (porDia.get(diaKey) || 0) + 1);
+        }
+
+        const serieDiaria = [];
+        for (let i = 29; i >= 0; i--) {
+          const dia = new Date();
+          dia.setDate(dia.getDate() - i);
+          const diaKey = dia.toISOString().slice(0, 10);
+          serieDiaria.push({ data: diaKey, total: porDia.get(diaKey) || 0 });
+        }
+
+        const LIMITE_RESPOSTA_MS = 6 * 60 * 60 * 1000;
+        const temposResposta = [];
+        const ultimaMensagemUsuario = new Map();
+
+        for (const msg of mensagensResult.data || []) {
+          if (msg.role === "user") {
+            ultimaMensagemUsuario.set(msg.phone, msg.created_at);
+          } else if (msg.role === "assistant") {
+            const inicioEm = ultimaMensagemUsuario.get(msg.phone);
+            if (inicioEm) {
+              const diffMs = new Date(msg.created_at) - new Date(inicioEm);
+              if (diffMs > 0 && diffMs < LIMITE_RESPOSTA_MS) temposResposta.push(diffMs);
+              ultimaMensagemUsuario.delete(msg.phone);
+            }
+          }
+        }
+
+        const tempoRespostaMedioMin = temposResposta.length
+          ? Math.round((temposResposta.reduce((a, b) => a + b, 0) / temposResposta.length / 60000) * 10) / 10
+          : null;
+
+        return res.status(200).json({
+          ok: true,
+          data: {
+            totalLeads: totalResult.count || 0,
+            leadsHoje,
+            porStage,
+            serieDiaria,
+            tempoRespostaMedioMin,
+            amostraTempoResposta: temposResposta.length
+          }
+        });
+      }
+
       if (req.query["hub.verify_token"] === env.VERIFY_TOKEN) {
         return res.status(200).send(req.query["hub.challenge"]);
       }
@@ -165,7 +251,7 @@ export default async function handler(req, res) {
     }
 
     // ─── POST DASHBOARD (send-message, takeover, release-ai) ────────────────
-    if (["send-message", "takeover", "release-ai"].includes(req.query.debug)) {
+    if (["send-message", "send-audio", "takeover", "release-ai"].includes(req.query.debug)) {
       const dashboardAction = req.query.debug;
       let dashboardBody = req.body || {};
 
@@ -208,6 +294,66 @@ export default async function handler(req, res) {
         await inserirMensagem({ phone, role: "assistant", content: message });
         await atualizarLeadPorTelefone(phone, {
           last_message: message,
+          updated_at: new Date().toISOString()
+        });
+
+        return res.status(200).json({ ok: true });
+      }
+
+      // send-audio (grava e envia audio de verdade pro cliente)
+      if (dashboardAction === "send-audio") {
+        const audioBase64 = String(dashboardBody?.audioBase64 || "");
+        if (!audioBase64) {
+          return res.status(400).json({ ok: false, error: "Áudio ausente" });
+        }
+
+        let audioBuffer;
+        try {
+          audioBuffer = Buffer.from(audioBase64, "base64");
+        } catch (err) {
+          console.error("DASHBOARD AUDIO BASE64 ERROR:", err);
+          return res.status(400).json({ ok: false, error: "Áudio em formato inválido" });
+        }
+
+        if (!audioBuffer.length) {
+          return res.status(400).json({ ok: false, error: "Áudio vazio" });
+        }
+        if (audioBuffer.length > 15 * 1024 * 1024) {
+          return res.status(400).json({ ok: false, error: "Áudio muito grande (máximo ~15MB)" });
+        }
+
+        let oggBuffer;
+        try {
+          oggBuffer = await transcodeParaOggOpus(audioBuffer);
+        } catch (err) {
+          console.error("DASHBOARD AUDIO TRANSCODE ERROR:", err);
+          return res.status(500).json({ ok: false, error: "Erro ao converter áudio" });
+        }
+
+        let mediaId;
+        try {
+          mediaId = await uploadWhatsAppMedia(oggBuffer, "audio/ogg", "mensagem.ogg");
+        } catch (err) {
+          console.error("DASHBOARD AUDIO UPLOAD ERROR:", err);
+          return res.status(500).json({ ok: false, error: "Erro ao subir áudio no WhatsApp" });
+        }
+
+        const whatsappResult = await enviarWhatsAppAudio(phone, mediaId);
+        if (!whatsappResult.ok) {
+          return res.status(500).json({ ok: false, error: "Erro ao enviar áudio no WhatsApp" });
+        }
+
+        const mediaUrl = await uploadAudioLead(oggBuffer, phone);
+
+        await inserirMensagem({
+          phone,
+          role: "assistant",
+          content: "[Áudio enviado manualmente]",
+          media_url: mediaUrl,
+          media_type: "audio"
+        });
+        await atualizarLeadPorTelefone(phone, {
+          last_message: "🎤 Áudio",
           updated_at: new Date().toISOString()
         });
 

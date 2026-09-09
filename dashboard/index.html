@@ -501,6 +501,123 @@
       display: none;
     }
 
+    .view-tabs {
+      display: none;
+      height: 56px;
+      align-items: center;
+      gap: 8px;
+      padding: 0 24px;
+      background: #101010;
+      border-bottom: 1px solid #222;
+      flex-shrink: 0;
+      box-sizing: border-box;
+    }
+
+    .view-tab {
+      background: transparent;
+      border: 1px solid #2a2a2a;
+      color: #aaa;
+      padding: 9px 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 14px;
+      font-family: inherit;
+    }
+
+    .view-tab:hover {
+      background: #1a1a1a;
+      color: #fff;
+    }
+
+    .view-tab.active {
+      background: #00ff88;
+      color: #000;
+      border-color: #00ff88;
+    }
+
+    .reports-view {
+      display: none;
+      height: calc(100vh - 70px - 56px);
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 22px 24px 40px;
+      box-sizing: border-box;
+    }
+
+    .reports-view.open {
+      display: block;
+    }
+
+    .reports-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+
+    .report-card {
+      background: #171717;
+      border: 1px solid #222;
+      border-radius: 14px;
+      padding: 18px;
+    }
+
+    .report-card strong {
+      display: block;
+      color: #00ff88;
+      font-size: 28px;
+      margin-bottom: 4px;
+    }
+
+    .report-card span {
+      color: #aaa;
+      font-size: 13px;
+    }
+
+    .report-panel {
+      background: #171717;
+      border: 1px solid #222;
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 22px;
+    }
+
+    .report-panel h3 {
+      margin: 0 0 16px;
+      color: #fff;
+      font-size: 15px;
+    }
+
+    .stage-row {
+      display: grid;
+      grid-template-columns: 130px 1fr 40px;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-size: 13px;
+      color: #ddd;
+    }
+
+    .stage-row .stage-track {
+      background: #111;
+      border-radius: 999px;
+      height: 10px;
+      overflow: hidden;
+    }
+
+    .stage-row .stage-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: #00ff88;
+    }
+
+    .reports-empty {
+      color: #777;
+      text-align: center;
+      margin-top: 60px;
+    }
+
     @media (max-width: 900px) {
 
       .layout {
@@ -573,6 +690,20 @@
       h1 {
         font-size: 18px;
       }
+
+      .view-tabs {
+        padding: 0 14px;
+        gap: 6px;
+      }
+
+      .view-tab {
+        padding: 8px 12px;
+        font-size: 13px;
+      }
+
+      .reports-view {
+        padding: 14px;
+      }
     }
   </style>
 </head>
@@ -600,6 +731,15 @@
     </button>
   </div>
 </header>
+
+<div id="viewTabs" class="view-tabs">
+  <button type="button" class="view-tab active" data-view="conversas" onclick="alternarView('conversas')">
+    💬 Conversas
+  </button>
+  <button type="button" class="view-tab" data-view="relatorios" onclick="alternarView('relatorios')">
+    📊 Relatórios
+  </button>
+</div>
 
 <div id="app" class="layout">
 
@@ -728,6 +868,12 @@
 
 </div>
 
+<div id="reportsView" class="reports-view">
+  <div id="reportsContent">
+    <div class="reports-empty">Carregando relatórios...</div>
+  </div>
+</div>
+
 <div
   id="imageViewer"
   class="image-viewer"
@@ -801,7 +947,17 @@ const imageViewer =
 const imageViewerImg =
   document.getElementById("imageViewerImg");
 
+const viewTabs =
+  document.getElementById("viewTabs");
+
+const reportsView =
+  document.getElementById("reportsView");
+
+const reportsContent =
+  document.getElementById("reportsContent");
+
 let leadsCache = [];
+let reportsIntervalo = null;
 let selectedPhone = null;
 let lastMessageCount = 0;
 let intervalo = null;
@@ -859,6 +1015,7 @@ document.addEventListener("keydown", function(event) {
 function mostrarApp() {
   app.style.display = "grid";
   logoutBtn.style.display = "inline-block";
+  viewTabs.style.display = "flex";
 }
 
 async function logout() {
@@ -1419,6 +1576,131 @@ function ownershipPresentation(lead) {
   if (lead.conversation_owner === "HUMAN_PENDING") return { css: "ai-hold", label: "Humano — aguardando Coringa" };
   if (lead.conversation_owner === "HUMAN" || lead.stage === "humano") return { css: "human", label: "Atendimento humano" };
   return { css: "ai", label: "IA ativa" };
+}
+
+function alternarView(view) {
+  document.querySelectorAll(".view-tab").forEach(botao => {
+    botao.classList.toggle("active", botao.dataset.view === view);
+  });
+
+  if (view === "relatorios") {
+    app.style.display = "none";
+    reportsView.classList.add("open");
+
+    carregarRelatorios();
+
+    if (reportsIntervalo) clearInterval(reportsIntervalo);
+    reportsIntervalo = setInterval(carregarRelatorios, 30000);
+  } else {
+    reportsView.classList.remove("open");
+    app.style.display = "grid";
+
+    if (reportsIntervalo) {
+      clearInterval(reportsIntervalo);
+      reportsIntervalo = null;
+    }
+  }
+}
+
+const STAGE_LABELS = {
+  humano: "Humano",
+  quente: "Quente",
+  agendamento: "Agendamento",
+  orcamento: "Orçamento",
+  novo: "Novo",
+  captando_nome: "Captando nome",
+  encerrado: "Encerrado",
+  followup_1: "Followup 1",
+  followup_2: "Followup 2",
+  curioso: "Curioso"
+};
+
+function renderGraficoSerie(serie) {
+  const largura = 760;
+  const altura = 160;
+  const margemBaixo = 20;
+  const max = Math.max(1, ...serie.map(d => d.total));
+  const larguraBarra = largura / serie.length;
+
+  const barras = serie.map((d, i) => {
+    const alturaBarra = Math.round((d.total / max) * (altura - margemBaixo - 10));
+    const x = i * larguraBarra;
+    const y = altura - margemBaixo - alturaBarra;
+    const destaque = i === serie.length - 1;
+    const cor = destaque ? "#00ff88" : "#0a5c3a";
+    return (
+      '<rect x="' + (x + 1) + '" y="' + y + '" width="' + Math.max(larguraBarra - 2, 1) +
+      '" height="' + Math.max(alturaBarra, 1) + '" rx="2" fill="' + cor + '">' +
+      '<title>' + escaparHTML(d.data) + ": " + d.total + '</title></rect>'
+    );
+  }).join("");
+
+  const labelInicio = serie[0] ? serie[0].data.slice(5).replace("-", "/") : "";
+  const labelFim = serie[serie.length - 1] ? serie[serie.length - 1].data.slice(5).replace("-", "/") : "";
+
+  return (
+    '<svg viewBox="0 0 ' + largura + ' ' + altura + '" width="100%" height="160" preserveAspectRatio="none">' +
+    '<line x1="0" y1="' + (altura - margemBaixo) + '" x2="' + largura + '" y2="' + (altura - margemBaixo) +
+    '" stroke="#2a2a2a" stroke-width="1"></line>' +
+    barras +
+    '</svg>' +
+    '<div style="display:flex;justify-content:space-between;color:#777;font-size:11px;margin-top:6px;">' +
+    '<span>' + escaparHTML(labelInicio) + '</span>' +
+    '<span>' + escaparHTML(labelFim) + '</span>' +
+    '</div>'
+  );
+}
+
+async function carregarRelatorios() {
+  reportsContent.innerHTML = '<div class="reports-empty">Carregando relatórios...</div>';
+
+  const res = await window.ossoAuth.authorizedFetch(
+    API + "?debug=stats"
+  );
+
+  const data =
+    await res.json();
+
+  if (!res.ok || !data.ok) {
+    reportsContent.innerHTML = '<div class="reports-empty">Não foi possível carregar os relatórios.</div>';
+    return;
+  }
+
+  const s = data.data;
+
+  const totalStage =
+    Object.values(s.porStage).reduce((a, b) => a + b, 0) || 1;
+
+  const stageRows = Object.entries(s.porStage)
+    .filter(([, qtd]) => qtd > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([stage, qtd]) => (
+      '<div class="stage-row">' +
+      '<span>' + escaparHTML(STAGE_LABELS[stage] || stage) + '</span>' +
+      '<div class="stage-track"><div class="stage-fill" style="width:' +
+      Math.round((qtd / totalStage) * 100) + '%"></div></div>' +
+      '<span style="text-align:right;">' + qtd + '</span>' +
+      '</div>'
+    )).join("") || '<div class="reports-empty">Sem leads nos últimos 30 dias.</div>';
+
+  const tempoResposta =
+    s.tempoRespostaMedioMin != null ? s.tempoRespostaMedioMin + " min" : "—";
+
+  reportsContent.innerHTML =
+    '<div class="reports-grid">' +
+    '<div class="report-card"><strong>' + s.totalLeads + '</strong><span>Total de leads</span></div>' +
+    '<div class="report-card"><strong>' + s.leadsHoje + '</strong><span>Novos hoje</span></div>' +
+    '<div class="report-card"><strong>' + tempoResposta + '</strong><span>Tempo médio de resposta (IA)</span></div>' +
+    '<div class="report-card"><strong>' + (s.porStage.humano || 0) + '</strong><span>Em atendimento humano</span></div>' +
+    '</div>' +
+    '<div class="report-panel">' +
+    '<h3>Leads novos — últimos 30 dias</h3>' +
+    renderGraficoSerie(s.serieDiaria) +
+    '</div>' +
+    '<div class="report-panel">' +
+    '<h3>Leads por estágio (últimos 30 dias)</h3>' +
+    stageRows +
+    '</div>';
 }
 
 window.ossoAuth.getSession().then(session => {
