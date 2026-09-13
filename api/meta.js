@@ -24,7 +24,6 @@ import {
   testarAdminAlerts
 } from "../services/meta/adminAlerts.js";
 import { enviarWhatsApp, enviarWhatsAppAudio, uploadWhatsAppMedia } from "../services/meta/whatsapp.js";
-import { transcodeParaOggOpus } from "../services/media/audioTranscode.js";
 import {
   atualizarLeadPorTelefone,
   buscarLeadPorTelefone,
@@ -452,6 +451,10 @@ export default async function handler(req, res) {
 
         let oggBuffer;
         try {
+          // Import dinâmico: se o módulo/dependências de transcodificação não
+          // estiverem disponíveis no deploy, só essa ação falha — não derruba
+          // o resto da API (leads, mensagens, agenda, etc.).
+          const { transcodeParaOggOpus } = await import("../services/media/audioTranscode.js");
           oggBuffer = await transcodeParaOggOpus(audioBuffer);
         } catch (err) {
           console.error("DASHBOARD AUDIO TRANSCODE ERROR:", err);
