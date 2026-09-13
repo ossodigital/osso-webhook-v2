@@ -885,7 +885,207 @@
       .owner-compare {
         grid-template-columns: 1fr;
       }
+
+      .module-form {
+        grid-template-columns: 1fr;
+      }
     }
+
+    .module-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .module-toolbar h2 {
+      margin: 0;
+      font-size: 16px;
+      color: #fff;
+    }
+
+    .module-form {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+      background: #171717;
+      border: 1px solid #222;
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    .module-form input,
+    .module-form select,
+    .module-form textarea {
+      background: #101010;
+      border: 1px solid #2a2a2a;
+      color: #eee;
+      padding: 9px 10px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 13px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .module-form label {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      color: #999;
+      font-size: 11px;
+    }
+
+    .module-form .form-actions {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      background: #00ff88;
+      border: 1px solid #00ff88;
+      color: #000;
+      padding: 9px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 13px;
+      font-family: inherit;
+    }
+
+    .btn-primary:hover {
+      background: #00d873;
+    }
+
+    .btn-secondary {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #eee;
+      padding: 9px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+    }
+
+    .btn-secondary:hover {
+      background: #242424;
+    }
+
+    .split-row {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: 1fr 90px auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .split-row .split-remove {
+      background: transparent;
+      border: 1px solid #333;
+      color: #ff6b6b;
+      border-radius: 8px;
+      cursor: pointer;
+      padding: 8px 10px;
+    }
+
+    .module-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .module-card {
+      background: #171717;
+      border: 1px solid #222;
+      border-left: 4px solid #00ff88;
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .module-card.saida {
+      border-left-color: #ff3b3b;
+    }
+
+    .module-card .mc-main {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .module-card .mc-title {
+      font-weight: bold;
+      color: #fff;
+      font-size: 14px;
+    }
+
+    .module-card .mc-sub {
+      color: #999;
+      font-size: 12px;
+    }
+
+    .module-card .mc-side {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .module-badge {
+      background: #111;
+      border: 1px solid #2a2a2a;
+      color: #ddd;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .module-select-status {
+      background: #101010;
+      border: 1px solid #2a2a2a;
+      color: #eee;
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: inherit;
+    }
+
+    .saldo-box {
+      background: #171717;
+      border: 1px solid #222;
+      border-radius: 14px;
+      padding: 16px 20px;
+      margin-bottom: 18px;
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    .saldo-box .sb-item strong {
+      display: block;
+      font-size: 22px;
+    }
+
+    .saldo-box .sb-item span {
+      color: #aaa;
+      font-size: 12px;
+    }
+
+    .sb-entrada strong { color: #00ff88; }
+    .sb-saida strong { color: #ff3b3b; }
   </style>
 </head>
 
@@ -919,6 +1119,18 @@
   </button>
   <button type="button" class="view-tab" data-view="relatorios" onclick="alternarView('relatorios')">
     📊 Relatórios
+  </button>
+  <button type="button" class="view-tab" data-view="agenda" onclick="alternarView('agenda')">
+    📅 Agenda
+  </button>
+  <button type="button" class="view-tab" data-view="orcamentos" onclick="alternarView('orcamentos')">
+    📝 Orçamentos
+  </button>
+  <button type="button" class="view-tab" data-view="financeiro" onclick="alternarView('financeiro')">
+    💰 Financeiro
+  </button>
+  <button type="button" class="view-tab" data-view="equipe" onclick="alternarView('equipe')">
+    👥 Equipe
   </button>
 </div>
 
@@ -1065,6 +1277,136 @@
   </div>
 </div>
 
+<div id="agendaView" class="reports-view">
+  <div class="module-toolbar">
+    <h2>📅 Agenda de sessões</h2>
+    <button type="button" class="export-btn" onclick="carregarAgenda()">↻ Atualizar</button>
+  </div>
+  <form class="module-form" onsubmit="return criarSessaoForm(event)">
+    <label>Telefone do lead
+      <input id="agTelefone" type="text" placeholder="5511999999999" required>
+    </label>
+    <label>Título
+      <input id="agTitulo" type="text" placeholder="Sessão de tatuagem" required>
+    </label>
+    <label>Data e hora
+      <input id="agData" type="datetime-local" required>
+    </label>
+    <label>Duração (min)
+      <input id="agDuracao" type="number" value="60" min="15" step="15">
+    </label>
+    <label>Profissional
+      <select id="agProfissional"><option value="">—</option></select>
+    </label>
+    <label>Observações
+      <input id="agNotas" type="text" placeholder="opcional">
+    </label>
+    <div class="form-actions">
+      <button type="submit" class="btn-primary">+ Agendar sessão</button>
+    </div>
+  </form>
+  <div id="agendaList" class="module-list">
+    <div class="reports-empty">Carregando agenda...</div>
+  </div>
+</div>
+
+<div id="orcamentosView" class="reports-view">
+  <div class="module-toolbar">
+    <h2>📝 Orçamentos e propostas</h2>
+    <button type="button" class="export-btn" onclick="carregarOrcamentos()">↻ Atualizar</button>
+  </div>
+  <form class="module-form" onsubmit="return criarOrcamentoForm(event)">
+    <label>Telefone do lead
+      <input id="orTelefone" type="text" placeholder="5511999999999" required>
+    </label>
+    <label>Descrição
+      <input id="orDescricao" type="text" placeholder="Fechamento de braço" required>
+    </label>
+    <label>Valor (R$)
+      <input id="orValor" type="number" step="0.01" min="0" required>
+    </label>
+    <label>Validade
+      <input id="orValidade" type="date">
+    </label>
+    <div class="form-actions">
+      <button type="submit" class="btn-primary">+ Criar orçamento</button>
+    </div>
+  </form>
+  <div id="orcamentosList" class="module-list">
+    <div class="reports-empty">Carregando orçamentos...</div>
+  </div>
+</div>
+
+<div id="financeiroView" class="reports-view">
+  <div class="module-toolbar">
+    <h2>💰 Financeiro</h2>
+    <button type="button" class="export-btn" onclick="carregarFinanceiro()">↻ Atualizar</button>
+  </div>
+  <div id="saldoBox" class="saldo-box"></div>
+  <form class="module-form" onsubmit="return criarTransacaoForm(event)">
+    <label>Tipo
+      <select id="fiTipo">
+        <option value="entrada">Entrada</option>
+        <option value="saida">Saída</option>
+      </select>
+    </label>
+    <label>Valor (R$)
+      <input id="fiValor" type="number" step="0.01" min="0" required>
+    </label>
+    <label>Descrição
+      <input id="fiDescricao" type="text" placeholder="Sessão finalizada" required>
+    </label>
+    <label>Categoria
+      <input id="fiCategoria" type="text" placeholder="opcional">
+    </label>
+    <label>Profissional principal
+      <select id="fiProfissional"><option value="">—</option></select>
+    </label>
+    <label>Data
+      <input id="fiData" type="date">
+    </label>
+    <div id="fiParticipantes"></div>
+    <div class="form-actions">
+      <button type="button" class="btn-secondary" onclick="adicionarLinhaParticipante()">+ Dividir com outro profissional</button>
+      <button type="submit" class="btn-primary">+ Lançar</button>
+    </div>
+  </form>
+  <div id="financeiroList" class="module-list">
+    <div class="reports-empty">Carregando financeiro...</div>
+  </div>
+</div>
+
+<div id="equipeView" class="reports-view">
+  <div class="module-toolbar">
+    <h2>👥 Equipe</h2>
+    <button type="button" class="export-btn" onclick="carregarEquipe()">↻ Atualizar</button>
+  </div>
+  <form class="module-form" onsubmit="return criarMembroForm(event)">
+    <input id="eqId" type="hidden" value="">
+    <label>Nome
+      <input id="eqNome" type="text" placeholder="Nome do profissional" required>
+    </label>
+    <label>Função
+      <select id="eqRole">
+        <option value="admin">Admin</option>
+        <option value="atendente" selected>Atendente</option>
+        <option value="tatuador">Tatuador</option>
+        <option value="barbeiro">Barbeiro</option>
+      </select>
+    </label>
+    <label>Comissão padrão (%)
+      <input id="eqComissao" type="number" step="0.01" min="0" max="100" placeholder="opcional">
+    </label>
+    <div class="form-actions">
+      <button type="submit" class="btn-primary" id="eqSubmitBtn">+ Adicionar membro</button>
+      <button type="button" class="btn-secondary" id="eqCancelBtn" style="display:none;" onclick="cancelarEdicaoMembro()">Cancelar edição</button>
+    </div>
+  </form>
+  <div id="equipeList" class="module-list">
+    <div class="reports-empty">Carregando equipe...</div>
+  </div>
+</div>
+
 <div
   id="imageViewer"
   class="image-viewer"
@@ -1147,10 +1489,23 @@ const reportsView =
 const reportsContent =
   document.getElementById("reportsContent");
 
+const agendaView =
+  document.getElementById("agendaView");
+
+const orcamentosView =
+  document.getElementById("orcamentosView");
+
+const financeiroView =
+  document.getElementById("financeiroView");
+
+const equipeView =
+  document.getElementById("equipeView");
+
 let leadsCache = [];
 let reportsIntervalo = null;
 let relatoriosPeriodoAtual = 30;
 let relatoriosUltimoResultado = null;
+let teamCache = [];
 let selectedPhone = null;
 let lastMessageCount = 0;
 let intervalo = null;
@@ -1776,22 +2131,28 @@ function alternarView(view) {
     botao.classList.toggle("active", botao.dataset.view === view);
   });
 
-  if (view === "relatorios") {
+  [reportsView, agendaView, orcamentosView, financeiroView, equipeView].forEach(el => el.classList.remove("open"));
+  if (reportsIntervalo) {
+    clearInterval(reportsIntervalo);
+    reportsIntervalo = null;
+  }
+
+  const modulos = {
+    relatorios: [reportsView, carregarRelatorios, true],
+    agenda: [agendaView, carregarAgenda, false],
+    orcamentos: [orcamentosView, carregarOrcamentos, false],
+    financeiro: [financeiroView, carregarFinanceiro, false],
+    equipe: [equipeView, carregarEquipe, false]
+  };
+
+  if (modulos[view]) {
+    const [el, load, autoRefresh] = modulos[view];
     app.style.display = "none";
-    reportsView.classList.add("open");
-
-    carregarRelatorios();
-
-    if (reportsIntervalo) clearInterval(reportsIntervalo);
-    reportsIntervalo = setInterval(carregarRelatorios, 30000);
+    el.classList.add("open");
+    load();
+    if (autoRefresh) reportsIntervalo = setInterval(load, 30000);
   } else {
-    reportsView.classList.remove("open");
     app.style.display = "grid";
-
-    if (reportsIntervalo) {
-      clearInterval(reportsIntervalo);
-      reportsIntervalo = null;
-    }
   }
 }
 
@@ -2021,6 +2382,389 @@ function exportarLeadsCSV() {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+function formatarMoeda(valor) {
+  return "R$ " + Number(valor || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function nomeProfissional(id) {
+  const membro = teamCache.find(t => t.id === id);
+  return membro ? membro.name : "—";
+}
+
+function preencherSelectsProfissionais() {
+  const ativos = teamCache.filter(m => m.active !== false);
+  ["agProfissional", "fiProfissional"].forEach(elId => {
+    const sel = document.getElementById(elId);
+    if (!sel) return;
+    const atual = sel.value;
+    sel.innerHTML = '<option value="">—</option>' +
+      ativos.map(m => '<option value="' + m.id + '">' + escaparHTML(m.name) + '</option>').join("");
+    sel.value = atual;
+  });
+}
+
+async function garantirTeamCache() {
+  if (teamCache.length) return;
+  const res = await window.ossoAuth.authorizedFetch(API + "?debug=team");
+  const data = await res.json();
+  if (res.ok && data.ok) {
+    teamCache = data.data || [];
+    preencherSelectsProfissionais();
+  }
+}
+
+// ─── Agenda ────────────────────────────────────────────────────────────────
+
+async function carregarAgenda() {
+  const box = document.getElementById("agendaList");
+  box.innerHTML = '<div class="reports-empty">Carregando agenda...</div>';
+  await garantirTeamCache();
+
+  const res = await window.ossoAuth.authorizedFetch(API + "?debug=sessions");
+  const data = await res.json();
+  if (!res.ok || !data.ok) {
+    box.innerHTML = '<div class="reports-empty">Não foi possível carregar a agenda.</div>';
+    return;
+  }
+
+  const sessions = data.data || [];
+  box.innerHTML = sessions.length
+    ? sessions.map(renderSessaoCard).join("")
+    : '<div class="reports-empty">Nenhuma sessão agendada.</div>';
+}
+
+function renderSessaoCard(s) {
+  return (
+    '<div class="module-card">' +
+    '<div class="mc-main">' +
+    '<span class="mc-title">' + escaparHTML(s.title) + '</span>' +
+    '<span class="mc-sub">' + escaparHTML(s.lead_phone) + ' · ' + formatarData(s.scheduled_at) + ' · ' +
+    (s.duration_min || 60) + 'min' +
+    (s.team_member_id ? ' · ' + escaparHTML(nomeProfissional(s.team_member_id)) : '') +
+    '</span>' +
+    '</div>' +
+    '<div class="mc-side">' +
+    '<select class="module-select-status" onchange="atualizarStatusSessao(\'' + s.id + '\', this.value)">' +
+    ["agendado", "confirmado", "concluido", "cancelado"].map(st =>
+      '<option value="' + st + '"' + (st === s.status ? " selected" : "") + '>' + st + '</option>'
+    ).join("") +
+    '</select>' +
+    '<button type="button" class="btn-secondary" onclick="abrirLeadDoRelatorio(\'' + s.lead_phone + '\')">Ver lead</button>' +
+    '</div>' +
+    '</div>'
+  );
+}
+
+async function atualizarStatusSessao(id, status) {
+  await window.ossoAuth.authorizedFetch(API + "?debug=update-session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, status })
+  });
+  carregarAgenda();
+}
+
+async function criarSessaoForm(event) {
+  event.preventDefault();
+  const telefone = document.getElementById("agTelefone").value.trim();
+  const titulo = document.getElementById("agTitulo").value.trim();
+  const dataHora = document.getElementById("agData").value;
+  if (!telefone || !titulo || !dataHora) return false;
+
+  const res = await window.ossoAuth.authorizedFetch(API + "?debug=create-session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      leadPhone: telefone,
+      title: titulo,
+      scheduledAt: new Date(dataHora).toISOString(),
+      durationMin: Number(document.getElementById("agDuracao").value) || 60,
+      teamMemberId: document.getElementById("agProfissional").value || null,
+      notes: document.getElementById("agNotas").value || null
+    })
+  });
+  const data = await res.json();
+  if (!res.ok || !data.ok) {
+    alert("Erro ao agendar: " + (data.error || res.status));
+    return false;
+  }
+  event.target.reset();
+  carregarAgenda();
+  return false;
+}
+
+// ─── Orçamentos ────────────────────────────────────────────────────────────
+
+async function carregarOrcamentos() {
+  const box = document.getElementById("orcamentosList");
+  box.innerHTML = '<div class="reports-empty">Carregando orçamentos...</div>';
+
+  const res = await window.ossoAuth.authorizedFetch(API + "?debug=orcamentos");
+  const data = await res.json();
+  if (!res.ok || !data.ok) {
+    box.innerHTML = '<div class="reports-empty">Não foi possível carregar os orçamentos.</div>';
+    return;
+  }
+
+  const lista = data.data || [];
+  box.innerHTML = lista.length
+    ? lista.map(renderOrcamentoCard).join("")
+    : '<div class="reports-empty">Nenhum orçamento criado.</div>';
+}
+
+function renderOrcamentoCard(o) {
+  return (
+    '<div class="module-card">' +
+    '<div class="mc-main">' +
+    '<span class="mc-title">' + escaparHTML(o.descricao) + ' — ' + formatarMoeda(o.valor) + '</span>' +
+    '<span class="mc-sub">' + escaparHTML(o.lead_phone) + (o.validade ? ' · válido até ' + o.validade : '') + '</span>' +
+    '</div>' +
+    '<div class="mc-side">' +
+    '<select class="module-select-status" onchange="atualizarStatusOrcamento(\'' + o.id + '\', this.value)">' +
+    ["rascunho", "enviado", "aprovado", "recusado"].map(st =>
+      '<option value="' + st + '"' + (st === o.status ? " selected" : "") + '>' + st + '</option>'
+    ).join("") +
+    '</select>' +
+    '<button type="button" class="btn-secondary" onclick="abrirLeadDoRelatorio(\'' + o.lead_phone + '\')">Ver lead</button>' +
+    '</div>' +
+    '</div>'
+  );
+}
+
+async function atualizarStatusOrcamento(id, status) {
+  await window.ossoAuth.authorizedFetch(API + "?debug=update-orcamento", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, status })
+  });
+  carregarOrcamentos();
+}
+
+async function criarOrcamentoForm(event) {
+  event.preventDefault();
+  const telefone = document.getElementById("orTelefone").value.trim();
+  const descricao = document.getElementById("orDescricao").value.trim();
+  const valor = Number(document.getElementById("orValor").value);
+  if (!telefone || !descricao || !Number.isFinite(valor)) return false;
+
+  const res = await window.ossoAuth.authorizedFetch(API + "?debug=create-orcamento", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      leadPhone: telefone,
+      descricao,
+      valor,
+      validade: document.getElementById("orValidade").value || null
+    })
+  });
+  const data = await res.json();
+  if (!res.ok || !data.ok) {
+    alert("Erro ao criar orçamento: " + (data.error || res.status));
+    return false;
+  }
+  event.target.reset();
+  carregarOrcamentos();
+  return false;
+}
+
+// ─── Financeiro ────────────────────────────────────────────────────────────
+
+let participantesCount = 0;
+
+function adicionarLinhaParticipante() {
+  const wrap = document.getElementById("fiParticipantes");
+  const rowId = "part_" + (participantesCount++);
+  const ativos = teamCache.filter(m => m.active !== false);
+
+  const div = document.createElement("div");
+  div.className = "split-row";
+  div.id = rowId;
+  div.innerHTML =
+    '<select class="part-membro"><option value="">Profissional convidado</option>' +
+    ativos.map(m => '<option value="' + m.id + '">' + escaparHTML(m.name) + '</option>').join("") +
+    '</select>' +
+    '<input class="part-percentual" type="number" min="0" max="100" step="0.01" placeholder="%">' +
+    '<button type="button" class="split-remove" onclick="document.getElementById(\'' + rowId + '\').remove()">×</button>';
+  wrap.appendChild(div);
+}
+
+async function carregarFinanceiro() {
+  const box = document.getElementById("financeiroList");
+  box.innerHTML = '<div class="reports-empty">Carregando financeiro...</div>';
+  await garantirTeamCache();
+
+  const res = await window.ossoAuth.authorizedFetch(API + "?debug=financeiro");
+  const data = await res.json();
+  if (!res.ok || !data.ok) {
+    box.innerHTML = '<div class="reports-empty">Não foi possível carregar o financeiro.</div>';
+    return;
+  }
+
+  const lista = data.data || [];
+  const totalEntrada = lista.filter(t => t.tipo === "entrada").reduce((a, t) => a + Number(t.valor), 0);
+  const totalSaida = lista.filter(t => t.tipo === "saida").reduce((a, t) => a + Number(t.valor), 0);
+
+  document.getElementById("saldoBox").innerHTML =
+    '<div class="sb-item sb-entrada"><strong>' + formatarMoeda(totalEntrada) + '</strong><span>Entradas</span></div>' +
+    '<div class="sb-item sb-saida"><strong>' + formatarMoeda(totalSaida) + '</strong><span>Saídas</span></div>' +
+    '<div class="sb-item"><strong>' + formatarMoeda(totalEntrada - totalSaida) + '</strong><span>Saldo</span></div>';
+
+  document.getElementById("financeiroList").innerHTML = lista.length
+    ? lista.map(renderTransacaoCard).join("")
+    : '<div class="reports-empty">Nenhum lançamento registrado.</div>';
+}
+
+function renderTransacaoCard(t) {
+  const participacoes = t.financeiro_participacoes || [];
+  const splitTxt = participacoes.length
+    ? ' · dividido: ' + participacoes.map(p => escaparHTML(nomeProfissional(p.team_member_id)) + ' ' + p.percentual + '%').join(", ")
+    : '';
+  return (
+    '<div class="module-card ' + (t.tipo === "saida" ? "saida" : "") + '">' +
+    '<div class="mc-main">' +
+    '<span class="mc-title">' + escaparHTML(t.descricao) + ' — ' + formatarMoeda(t.valor) + '</span>' +
+    '<span class="mc-sub">' + t.data + (t.categoria ? ' · ' + escaparHTML(t.categoria) : '') +
+    (t.team_member_id ? ' · ' + escaparHTML(nomeProfissional(t.team_member_id)) : '') + splitTxt +
+    '</span>' +
+    '</div>' +
+    '<span class="module-badge">' + (t.tipo === "entrada" ? "Entrada" : "Saída") + '</span>' +
+    '</div>'
+  );
+}
+
+async function criarTransacaoForm(event) {
+  event.preventDefault();
+  const valor = Number(document.getElementById("fiValor").value);
+  const descricao = document.getElementById("fiDescricao").value.trim();
+  if (!Number.isFinite(valor) || !descricao) return false;
+
+  const participantes = Array.from(document.querySelectorAll("#fiParticipantes .split-row")).map(row => ({
+    teamMemberId: row.querySelector(".part-membro").value,
+    percentual: Number(row.querySelector(".part-percentual").value)
+  })).filter(p => p.teamMemberId && p.percentual > 0);
+
+  const res = await window.ossoAuth.authorizedFetch(API + "?debug=create-transacao", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      tipo: document.getElementById("fiTipo").value,
+      valor,
+      descricao,
+      categoria: document.getElementById("fiCategoria").value || null,
+      teamMemberId: document.getElementById("fiProfissional").value || null,
+      data: document.getElementById("fiData").value || null,
+      participantes
+    })
+  });
+  const data = await res.json();
+  if (!res.ok || !data.ok) {
+    alert("Erro ao lançar: " + (data.error || res.status));
+    return false;
+  }
+  event.target.reset();
+  document.getElementById("fiParticipantes").innerHTML = "";
+  carregarFinanceiro();
+  return false;
+}
+
+// ─── Equipe ────────────────────────────────────────────────────────────────
+
+async function carregarEquipe() {
+  const box = document.getElementById("equipeList");
+  box.innerHTML = '<div class="reports-empty">Carregando equipe...</div>';
+
+  const res = await window.ossoAuth.authorizedFetch(API + "?debug=team");
+  const data = await res.json();
+  if (!res.ok || !data.ok) {
+    box.innerHTML = '<div class="reports-empty">Não foi possível carregar a equipe.</div>';
+    return;
+  }
+
+  teamCache = data.data || [];
+  preencherSelectsProfissionais();
+  box.innerHTML = teamCache.length
+    ? teamCache.map(renderMembroCard).join("")
+    : '<div class="reports-empty">Nenhum membro cadastrado.</div>';
+}
+
+function renderMembroCard(m) {
+  return (
+    '<div class="module-card">' +
+    '<div class="mc-main">' +
+    '<span class="mc-title">' + escaparHTML(m.name) + (m.active === false ? " (inativo)" : "") + '</span>' +
+    '<span class="mc-sub">' + escaparHTML(m.role) +
+    (m.comissao_percentual != null ? ' · comissão padrão ' + m.comissao_percentual + '%' : '') +
+    '</span>' +
+    '</div>' +
+    '<div class="mc-side">' +
+    '<button type="button" class="btn-secondary" onclick="editarMembro(\'' + m.id + '\')">Editar</button>' +
+    '<button type="button" class="btn-secondary" onclick="alternarAtivoMembro(\'' + m.id + '\', ' + (m.active !== false) + ')">' +
+    (m.active === false ? "Ativar" : "Desativar") + '</button>' +
+    '</div>' +
+    '</div>'
+  );
+}
+
+function editarMembro(id) {
+  const m = teamCache.find(t => t.id === id);
+  if (!m) return;
+  document.getElementById("eqId").value = m.id;
+  document.getElementById("eqNome").value = m.name;
+  document.getElementById("eqRole").value = m.role;
+  document.getElementById("eqComissao").value = m.comissao_percentual != null ? m.comissao_percentual : "";
+  document.getElementById("eqSubmitBtn").textContent = "Salvar alterações";
+  document.getElementById("eqCancelBtn").style.display = "inline-block";
+}
+
+function cancelarEdicaoMembro() {
+  document.getElementById("eqId").value = "";
+  document.getElementById("eqNome").value = "";
+  document.getElementById("eqRole").value = "atendente";
+  document.getElementById("eqComissao").value = "";
+  document.getElementById("eqSubmitBtn").textContent = "+ Adicionar membro";
+  document.getElementById("eqCancelBtn").style.display = "none";
+}
+
+async function alternarAtivoMembro(id, ativoAtual) {
+  const m = teamCache.find(t => t.id === id);
+  if (!m) return;
+  await window.ossoAuth.authorizedFetch(API + "?debug=upsert-team-member", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id, name: m.name, role: m.role,
+      comissaoPercentual: m.comissao_percentual, active: !ativoAtual
+    })
+  });
+  carregarEquipe();
+}
+
+async function criarMembroForm(event) {
+  event.preventDefault();
+  const nome = document.getElementById("eqNome").value.trim();
+  if (!nome) return false;
+
+  const id = document.getElementById("eqId").value || undefined;
+  const res = await window.ossoAuth.authorizedFetch(API + "?debug=upsert-team-member", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id,
+      name: nome,
+      role: document.getElementById("eqRole").value,
+      comissaoPercentual: document.getElementById("eqComissao").value || null
+    })
+  });
+  const data = await res.json();
+  if (!res.ok || !data.ok) {
+    alert("Erro ao salvar membro: " + (data.error || res.status));
+    return false;
+  }
+  cancelarEdicaoMembro();
+  carregarEquipe();
+  return false;
 }
 
 window.ossoAuth.getSession().then(session => {

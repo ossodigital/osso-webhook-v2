@@ -44,6 +44,10 @@ import {
   listarLeadsParaRelatorio,
   listarMensagensParaTempoResposta
 } from "../services/supabase/statsRepository.js";
+import { listarTeamMembers, criarTeamMember, atualizarTeamMember } from "../services/supabase/teamRepository.js";
+import { listarSessions, criarSession, atualizarSession } from "../services/supabase/sessionsRepository.js";
+import { listarOrcamentos, criarOrcamento, atualizarOrcamento } from "../services/supabase/orcamentosRepository.js";
+import { listarTransacoes, criarTransacao, criarParticipacoes } from "../services/supabase/financeiroRepository.js";
 
 function validarDashboardToken(req) {
   const dashboardToken = env.DASHBOARD_TOKEN;
@@ -321,6 +325,48 @@ export default async function handler(req, res) {
         });
       }
 
+      if (req.query.debug === "team") {
+        if (!validarDashboardToken(req)) {
+          return res.status(403).json({ ok: false, error: "Acesso negado" });
+        }
+        const { data, error } = await listarTeamMembers();
+        if (error) return res.status(500).json({ ok: false, error: error.message });
+        return res.status(200).json({ ok: true, data });
+      }
+
+      if (req.query.debug === "sessions") {
+        if (!validarDashboardToken(req)) {
+          return res.status(403).json({ ok: false, error: "Acesso negado" });
+        }
+        const { data, error } = await listarSessions({
+          desde: req.query.desde || null,
+          ate: req.query.ate || null
+        });
+        if (error) return res.status(500).json({ ok: false, error: error.message });
+        return res.status(200).json({ ok: true, data });
+      }
+
+      if (req.query.debug === "orcamentos") {
+        if (!validarDashboardToken(req)) {
+          return res.status(403).json({ ok: false, error: "Acesso negado" });
+        }
+        const { data, error } = await listarOrcamentos({ phone: req.query.phone || null });
+        if (error) return res.status(500).json({ ok: false, error: error.message });
+        return res.status(200).json({ ok: true, data });
+      }
+
+      if (req.query.debug === "financeiro") {
+        if (!validarDashboardToken(req)) {
+          return res.status(403).json({ ok: false, error: "Acesso negado" });
+        }
+        const { data, error } = await listarTransacoes({
+          desde: req.query.desde || null,
+          ate: req.query.ate || null
+        });
+        if (error) return res.status(500).json({ ok: false, error: error.message });
+        return res.status(200).json({ ok: true, data });
+      }
+
       if (req.query["hub.verify_token"] === env.VERIFY_TOKEN) {
         return res.status(200).send(req.query["hub.challenge"]);
       }
@@ -503,6 +549,159 @@ export default async function handler(req, res) {
         }
 
         return res.status(200).json({ ok: true });
+      }
+
+      return res.status(400).json({ ok: false, error: "Ação inválida" });
+    }
+
+    // ─── POST MÓDULOS (agenda, orçamentos, financeiro, equipe) ──────────────
+    const MODULE_ACTIONS = [
+      "create-session", "update-session",
+      "create-orcamento", "update-orcamento",
+      "create-transacao",
+      "upsert-team-member"
+    ];
+    if (MODULE_ACTIONS.includes(req.query.debug)) {
+      const moduleAction = req.query.debug;
+      let moduleBody = req.body || {};
+
+      if (Buffer.isBuffer(moduleBody)) {
+        moduleBody = moduleBody.toString("utf8");
+      }
+      if (typeof moduleBody === "string") {
+        try {
+          moduleBody = JSON.parse(moduleBody || "{}");
+        } catch (err) {
+          console.error("MODULE BODY JSON ERROR:", moduleAction, err);
+          return res.status(400).json({ ok: false, error: "Body JSON inválido" });
+        }
+      }
+
+      const moduleToken = env.DASHBOARD_TOKEN;
+      if (!moduleToken || moduleBody?.token !== moduleToken) {
+        console.error("MODULE TOKEN ERROR:", moduleAction);
+        return res.status(403).json({ ok: false, error: "Acesso negado" });
+      }
+
+      if (moduleAction === "create-session") {
+        const phone = String(moduleBody?.leadPhone || "").trim();
+        const title = String(moduleBody?.title || "").trim();
+        const scheduledAt = moduleBody?.scheduledAt;
+        if (!phone || !title || !scheduledAt) {
+          return res.status(400).json({ ok: false, error: "leadPhone, title e scheduledAt são obrigatórios" });
+        }
+        const { data, error } = await criarSession({
+          lead_phone: phone,
+          title,
+          scheduled_at: scheduledAt,
+          duration_min: Number(moduleBody?.durationMin) || 60,
+          status: moduleBody?.status || "agendado",
+          team_member_id: moduleBody?.teamMemberId || null,
+          notes: moduleBody?.notes || null
+        });
+        if (error) return res.status(500).json({ ok: false, error: error.message });
+        return res.status(200).json({ ok: true, data });
+      }
+
+      if (moduleAction === "update-session") {
+        const id = String(moduleBody?.id || "").trim();
+        if (!id) return res.status(400).json({ ok: false, error: "id é obrigatório" });
+        const patch = { updated_at: new Date().toISOString() };
+        if (moduleBody?.status) patch.status = moduleBody.status;
+        if (moduleBody?.scheduledAt) patch.scheduled_at = moduleBody.scheduledAt;
+        if (moduleBody?.notes !== undefined) patch.notes = moduleBody.notes;
+        const { data, error } = await atualizarSession(id, patch);
+        if (error) return res.status(500).json({ ok: false, error: error.message });
+        return res.status(200).json({ ok: true, data });
+      }
+
+      if (moduleAction === "create-orcamento") {
+        const phone = String(moduleBody?.leadPhone || "").trim();
+        const descricao = String(moduleBody?.descricao || "").trim();
+        const valor = Number(moduleBody?.valor);
+        if (!phone || !descricao || !Number.isFinite(valor)) {
+          return res.status(400).json({ ok: false, error: "leadPhone, descricao e valor são obrigatórios" });
+        }
+        const { data, error } = await criarOrcamento({
+          lead_phone: phone,
+          descricao,
+          valor,
+          status: moduleBody?.status || "rascunho",
+          validade: moduleBody?.validade || null
+        });
+        if (error) return res.status(500).json({ ok: false, error: error.message });
+        return res.status(200).json({ ok: true, data });
+      }
+
+      if (moduleAction === "update-orcamento") {
+        const id = String(moduleBody?.id || "").trim();
+        if (!id) return res.status(400).json({ ok: false, error: "id é obrigatório" });
+        const patch = { updated_at: new Date().toISOString() };
+        if (moduleBody?.status) patch.status = moduleBody.status;
+        if (moduleBody?.valor !== undefined) patch.valor = Number(moduleBody.valor);
+        const { data, error } = await atualizarOrcamento(id, patch);
+        if (error) return res.status(500).json({ ok: false, error: error.message });
+        return res.status(200).json({ ok: true, data });
+      }
+
+      if (moduleAction === "create-transacao") {
+        const tipo = String(moduleBody?.tipo || "").trim();
+        const valor = Number(moduleBody?.valor);
+        const descricao = String(moduleBody?.descricao || "").trim();
+        if (!["entrada", "saida"].includes(tipo) || !Number.isFinite(valor) || !descricao) {
+          return res.status(400).json({ ok: false, error: "tipo (entrada/saida), valor e descricao são obrigatórios" });
+        }
+
+        const { data, error } = await criarTransacao({
+          tipo,
+          valor,
+          descricao,
+          categoria: moduleBody?.categoria || null,
+          lead_phone: moduleBody?.leadPhone || null,
+          team_member_id: moduleBody?.teamMemberId || null,
+          data: moduleBody?.data || new Date().toISOString().slice(0, 10)
+        });
+        if (error) return res.status(500).json({ ok: false, error: error.message });
+
+        // Divisão opcional entre profissionais (ex.: tatuador convidado leva X%)
+        const participantes = Array.isArray(moduleBody?.participantes) ? moduleBody.participantes : [];
+        if (participantes.length) {
+          const somaPercentual = participantes.reduce((soma, p) => soma + Number(p.percentual || 0), 0);
+          if (somaPercentual > 100) {
+            return res.status(400).json({ ok: false, error: "Soma dos percentuais de participação passa de 100%" });
+          }
+          const linhas = participantes.map((p) => ({
+            transacao_id: data.id,
+            team_member_id: p.teamMemberId,
+            percentual: Number(p.percentual),
+            valor: Math.round(valor * (Number(p.percentual) / 100) * 100) / 100
+          }));
+          const { error: participacoesError } = await criarParticipacoes(linhas);
+          if (participacoesError) {
+            console.error("MODULE FINANCEIRO PARTICIPACOES ERROR:", participacoesError);
+          }
+        }
+
+        return res.status(200).json({ ok: true, data });
+      }
+
+      if (moduleAction === "upsert-team-member") {
+        const name = String(moduleBody?.name || "").trim();
+        if (!name) {
+          return res.status(400).json({ ok: false, error: "name é obrigatório" });
+        }
+        const id = String(moduleBody?.id || "").trim();
+        const payload = {
+          name,
+          role: moduleBody?.role || "atendente",
+          comissao_percentual: moduleBody?.comissaoPercentual != null ? Number(moduleBody.comissaoPercentual) : null,
+          active: moduleBody?.active !== false
+        };
+        const { data, error } = id
+          ? await atualizarTeamMember(id, payload)
+          : await criarTeamMember(payload);
+        if (error) return res.status(500).json({ ok: false, error: error.message });
+        return res.status(200).json({ ok: true, data });
       }
 
       return res.status(400).json({ ok: false, error: "Ação inválida" });

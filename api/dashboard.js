@@ -2,8 +2,17 @@ import fetch from "node-fetch";
 import { env } from "../config/env.js";
 import { requireDashboardUser } from "../services/auth/dashboardAuth.js";
 
-const GET_ACTIONS = new Set(["ping", "leads", "messages", "messages-by-phone", "stats"]);
-const POST_ACTIONS = new Set(["send-message", "send-audio", "takeover", "release-ai"]);
+const GET_ACTIONS = new Set([
+  "ping", "leads", "messages", "messages-by-phone", "stats",
+  "team", "sessions", "orcamentos", "financeiro"
+]);
+const POST_ACTIONS = new Set([
+  "send-message", "send-audio", "takeover", "release-ai",
+  "create-session", "update-session",
+  "create-orcamento", "update-orcamento",
+  "create-transacao",
+  "upsert-team-member"
+]);
 
 /**
  * Supabase-authenticated facade for the unchanged CRM API.
