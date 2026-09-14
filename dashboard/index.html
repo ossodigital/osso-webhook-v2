@@ -36,23 +36,30 @@
       align-items: center;
       background: #101010;
       flex-shrink: 0;
+      gap: 10px;
     }
 
     h1 {
       color: #00ff88;
-      font-size: 24px;
+      font-size: clamp(15px, 4vw, 24px);
       margin: 0;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .header-right {
       display: flex;
       align-items: center;
       gap: 10px;
+      flex-shrink: 0;
     }
 
     .status {
       color: #aaa;
       font-size: 14px;
+      white-space: nowrap;
     }
 
     .logout-btn {
@@ -154,15 +161,31 @@
     }
 
     .chat-title {
-      font-size: 22px;
+      font-size: clamp(16px, 4vw, 22px);
       font-weight: bold;
       color: #00ff88;
       margin-bottom: 6px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .chat-subtitle {
       color: #aaa;
       font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .chat-subtitle-last {
+      color: #888;
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
     }
 
     .manual-note {
@@ -482,12 +505,57 @@
     .metric strong {
       display: block;
       color: #00ff88;
-      font-size: 20px;
+      font-size: clamp(16px, 5vw, 20px);
     }
 
     .metric span {
       color: #aaa;
       font-size: 11px;
+    }
+
+    .quick-ops {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .quick-op-card {
+      background: #171717;
+      border: 1px solid #222;
+      border-radius: 10px;
+      padding: 10px 6px;
+      text-align: center;
+      cursor: pointer;
+      color: #ddd;
+      font-family: inherit;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      min-height: 44px;
+      justify-content: center;
+    }
+
+    .quick-op-card:hover {
+      background: #1e1e1e;
+      border-color: #00ff88;
+    }
+
+    .quick-op-icon {
+      font-size: 18px;
+    }
+
+    .quick-op-label {
+      font-size: 11px;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    @media (min-width: 700px) {
+      .quick-ops {
+        grid-template-columns: repeat(5, 1fr);
+      }
     }
 
     .empty {
@@ -511,6 +579,14 @@
       border-bottom: 1px solid #222;
       flex-shrink: 0;
       box-sizing: border-box;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+
+    .view-tabs::-webkit-scrollbar {
+      display: none;
     }
 
     .view-tab {
@@ -523,6 +599,8 @@
       font-weight: bold;
       font-size: 14px;
       font-family: inherit;
+      flex-shrink: 0;
+      white-space: nowrap;
     }
 
     .view-tab:hover {
@@ -534,6 +612,16 @@
       background: #00ff88;
       color: #000;
       border-color: #00ff88;
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible,
+    .view-tab:focus-visible,
+    .lead-card:focus-visible {
+      outline: 2px solid #00bfff;
+      outline-offset: 2px;
     }
 
     .reports-view {
@@ -792,9 +880,23 @@
 
     @media (max-width: 900px) {
 
+      header {
+        height: 56px;
+        padding: 10px 14px;
+      }
+
+      .header-tagline {
+        display: none !important;
+      }
+
       .layout {
         grid-template-columns: 1fr;
         grid-template-rows: 1fr;
+        height: calc(100vh - 56px);
+      }
+
+      .reports-view {
+        height: calc(100vh - 56px - 56px);
       }
 
       .sidebar {
@@ -831,6 +933,10 @@
         font-size: 14px;
         min-height: 40px;
         cursor: pointer;
+      }
+
+      .chat-header {
+        padding: 12px 14px;
       }
 
       .chat-buttons {
@@ -891,6 +997,34 @@
       }
     }
 
+    @media (max-width: 480px) {
+
+      .top-metrics {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .quick-ops {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .sidebar {
+        padding: 10px;
+      }
+
+      .lead-card {
+        padding: 11px;
+      }
+
+      header {
+        padding: 8px 10px;
+      }
+
+      .logout-btn {
+        padding: 8px 10px;
+        font-size: 13px;
+      }
+    }
+
     .module-toolbar {
       display: flex;
       justify-content: space-between;
@@ -898,6 +1032,43 @@
       flex-wrap: wrap;
       gap: 10px;
       margin-bottom: 18px;
+    }
+
+    .collapsible-toggle {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      background: #171717;
+      border: 1px solid #222;
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: #eee;
+      font-weight: bold;
+      font-size: 14px;
+      font-family: inherit;
+      cursor: pointer;
+      margin-bottom: 12px;
+    }
+
+    .collapsible-toggle:hover {
+      background: #1e1e1e;
+    }
+
+    .collapsible-toggle .chev {
+      transition: transform .15s;
+    }
+
+    .collapsible-toggle.open .chev {
+      transform: rotate(180deg);
+    }
+
+    .collapsible-body {
+      display: none;
+    }
+
+    .collapsible-body.open {
+      display: block;
     }
 
     .module-toolbar h2 {
@@ -1094,7 +1265,7 @@
 <header>
   <h1>
     💀 Tattoo Até os Ossos CRM
-    <small style="display:block; margin-top:4px; color:#888; font-size:11px; font-weight:normal;">
+    <small class="header-tagline" style="display:block; margin-top:4px; color:#888; font-size:11px; font-weight:normal;">
       Powered by Osso Digital
     </small>
   </h1>
@@ -1137,6 +1308,29 @@
 <div id="app" class="layout">
 
   <aside class="sidebar">
+
+    <div class="quick-ops">
+      <button type="button" class="quick-op-card" onclick="alternarView('agenda')">
+        <span class="quick-op-icon">📅</span>
+        <span class="quick-op-label">Agenda</span>
+      </button>
+      <button type="button" class="quick-op-card" onclick="alternarView('orcamentos')">
+        <span class="quick-op-icon">📝</span>
+        <span class="quick-op-label">Orçamentos</span>
+      </button>
+      <button type="button" class="quick-op-card" onclick="alternarView('financeiro')">
+        <span class="quick-op-icon">💰</span>
+        <span class="quick-op-label">Financeiro</span>
+      </button>
+      <button type="button" class="quick-op-card" onclick="alternarView('relatorios')">
+        <span class="quick-op-icon">📊</span>
+        <span class="quick-op-label">Relatórios</span>
+      </button>
+      <button type="button" class="quick-op-card" onclick="alternarView('equipe')">
+        <span class="quick-op-icon">👥</span>
+        <span class="quick-op-label">Equipe</span>
+      </button>
+    </div>
 
     <div class="top-metrics">
 
@@ -1381,6 +1575,11 @@
     <h2>👥 Equipe</h2>
     <button type="button" class="export-btn" onclick="carregarEquipe()">↻ Atualizar</button>
   </div>
+  <button type="button" id="eqToggle" class="collapsible-toggle" onclick="alternarFormEquipe()">
+    <span id="eqToggleLabel">Equipe (0)</span>
+    <span class="chev">▼</span>
+  </button>
+  <div id="eqFormWrap" class="collapsible-body">
   <form class="module-form" onsubmit="return criarMembroForm(event)">
     <input id="eqId" type="hidden" value="">
     <label>Nome
@@ -1402,6 +1601,7 @@
       <button type="button" class="btn-secondary" id="eqCancelBtn" style="display:none;" onclick="cancelarEdicaoMembro()">Cancelar edição</button>
     </div>
   </form>
+  </div>
   <div id="equipeList" class="module-list">
     <div class="reports-empty">Carregando equipe...</div>
   </div>
@@ -1738,12 +1938,15 @@ async function carregarLeads() {
 function atualizarHeaderLead(lead) {
 
   const ownership = ownershipPresentation(lead);
+  const stage = lead.stage || "novo";
 
   chatTitle.innerHTML =
     `${escaparHTML(lead.name || "Sem nome")} — ${escaparHTML(lead.phone)}`;
 
   chatSubtitle.innerHTML =
-    `Stage comercial: ${escaparHTML(lead.stage || "novo")} • Ownership: ${escaparHTML(ownership.label)} • Última mensagem: ${escaparHTML(lead.last_message || "")}`;
+    `<span class="lead-stage ${escaparHTML(stage)}">${escaparHTML(stage)}</span>` +
+    `<span class="lead-ownership ${escaparHTML(ownership.css)}">${escaparHTML(ownership.label)}</span>` +
+    (lead.last_message ? ` <span class="chat-subtitle-last">${escaparHTML(lead.last_message)}</span>` : "");
 
   manualNote.style.display =
     lead.conversation_owner === "HUMAN" || lead.stage === "humano"
@@ -2687,6 +2890,17 @@ async function carregarEquipe() {
   box.innerHTML = teamCache.length
     ? teamCache.map(renderMembroCard).join("")
     : '<div class="reports-empty">Nenhum membro cadastrado.</div>';
+
+  const eqToggleLabel = document.getElementById("eqToggleLabel");
+  if (eqToggleLabel) eqToggleLabel.textContent = `Equipe (${teamCache.length})`;
+}
+
+function alternarFormEquipe(forcarAberto) {
+  const wrap = document.getElementById("eqFormWrap");
+  const toggle = document.getElementById("eqToggle");
+  const abrir = forcarAberto != null ? forcarAberto : !wrap.classList.contains("open");
+  wrap.classList.toggle("open", abrir);
+  toggle.classList.toggle("open", abrir);
 }
 
 function renderMembroCard(m) {
@@ -2716,6 +2930,7 @@ function editarMembro(id) {
   document.getElementById("eqComissao").value = m.comissao_percentual != null ? m.comissao_percentual : "";
   document.getElementById("eqSubmitBtn").textContent = "Salvar alterações";
   document.getElementById("eqCancelBtn").style.display = "inline-block";
+  alternarFormEquipe(true);
 }
 
 function cancelarEdicaoMembro() {
