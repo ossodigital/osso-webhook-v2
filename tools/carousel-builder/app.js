@@ -95,7 +95,7 @@
       brandFontSize: 24,
       brandOffsetX: 0,
       brandOffsetY: 0,
-      headlineScale: 100,
+      headlineScale: 120,
       fontFamily: "'Bebas Neue', Impact, 'Arial Narrow', sans-serif",
       headline: ["ARTE", "QUE IMPÕE", "RESPEITO."],
       styleWords: ["SAMURAI", "REALISMO", "COBERTURA"],
@@ -399,6 +399,11 @@
   }
 
   function drawCtaButton(ctx, slide, x, y, w, h) {
+    // h already reflects textScale (the caller scales the button box itself),
+    // so the font size below must derive only from h — never re-apply scale
+    // here, or the label grows quadratically and overflows the fixed-width
+    // button (text drawn outside the pill is invisible against the dark
+    // background, which looks like the label got clipped).
     ctx.save();
     const r = 14;
     ctx.beginPath();
@@ -411,43 +416,53 @@
     ctx.fillStyle = slide.accentColor;
     ctx.fill();
     ctx.fillStyle = "#04140d";
-    ctx.font = "900 " + Math.round(h * 0.36) + "px " + slide.fontFamily;
+    let fontSize = h * 0.36;
+    const label = ctaLabel(slide).toUpperCase();
+    const maxTextWidth = w * 0.88;
+    for (let i = 0; i < 12; i++) {
+      ctx.font = `900 ${Math.round(fontSize)}px ` + slide.fontFamily;
+      if (ctx.measureText(label).width <= maxTextWidth) break;
+      fontSize *= 0.9;
+    }
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(ctaLabel(slide).toUpperCase(), x + w / 2, y + h / 2 + 2);
+    ctx.fillText(label, x + w / 2, y + h / 2 + 2);
     ctx.textBaseline = "alphabetic";
     ctx.textAlign = "left";
     ctx.restore();
   }
 
-  function drawPhoneRow(ctx, slide, x, y, w) {
+  function drawPhoneRow(ctx, slide, x, y, w, scale = 1) {
     ctx.fillStyle = slide.textColor;
-    ctx.font = "800 46px " + slide.fontFamily;
+    ctx.font = `800 ${Math.round(46 * scale)}px ` + slide.fontFamily;
     ctx.textAlign = "left";
     ctx.fillText(slide.phone, x, y);
     const cmd = slide.command || "";
     const idx = cmd.lastIndexOf(" ");
     const prefix = idx >= 0 ? cmd.slice(0, idx + 1) : cmd;
     const last = idx >= 0 ? cmd.slice(idx + 1) : "";
-    ctx.font = "700 26px " + slide.fontFamily;
+    const cmdFont = `700 ${Math.round(26 * scale)}px ` + slide.fontFamily;
+    ctx.font = cmdFont;
     ctx.fillStyle = slide.textSecondaryColor;
     const prefixW = ctx.measureText(prefix).width;
-    ctx.fillText(prefix, x, y + 36);
+    const cmdY = y + 36 * scale;
+    ctx.fillText(prefix, x, cmdY);
     ctx.fillStyle = slide.accentColor;
-    ctx.fillText(last, x + prefixW, y + 36);
+    ctx.fillText(last, x + prefixW, cmdY);
   }
 
-  function drawFooter(ctx, slide, x, y, w) {
+  function drawFooter(ctx, slide, x, y, w, scale = 1) {
     let cursorX = x;
     if (slide.badgeOn) {
       drawCheckBadge(ctx, x + 14, y - 6, 15, slide.accentColor);
       cursorX = x + 40;
     }
-    ctx.font = "600 22px " + slide.fontFamily;
+    const footerFont = `600 ${Math.round(22 * scale)}px ` + slide.fontFamily;
+    ctx.font = footerFont;
     ctx.fillStyle = slide.textSecondaryColor;
     ctx.textAlign = "left";
-    const lines = wrapWords(ctx, slide.notice, w - (cursorX - x), "600 22px " + slide.fontFamily);
-    lines.slice(0, 2).forEach((l, i) => ctx.fillText(l, cursorX, y + i * 26));
+    const lines = wrapWords(ctx, slide.notice, w - (cursorX - x), footerFont);
+    lines.slice(0, 2).forEach((l, i) => ctx.fillText(l, cursorX, y + i * 26 * scale));
   }
 
   // ---------- main frame renderer ----------
@@ -490,33 +505,36 @@
       drawBrandName(ctx, slide, textRect.x, textRect.y, maxWidth);
     });
 
-    // bottom-anchored commercial stack
+    // bottom-anchored commercial stack — textScale grows fonts AND their
+    // allotted box heights together so bigger text never collides with
+    // its neighbors in the stack.
     const showStyleLine = dir !== "C";
-    const gapS = 14, gapM = 26;
+    const textScale = (slide.headlineScale ?? 100) / 100;
+    const gapS = 14 * textScale, gapM = 26 * textScale;
     let cy = textRect.y + textRect.h;
 
-    const footerH = slide.badgeOn || slide.notice ? 54 : 0;
+    const footerH = (slide.badgeOn || slide.notice ? 54 : 0) * textScale;
     cy -= footerH;
-    const footerY = cy + 20;
+    const footerY = cy + 20 * textScale;
     cy -= gapS;
 
-    cy -= 34;
-    const locationY = cy + 24;
+    cy -= 34 * textScale;
+    const locationY = cy + 24 * textScale;
     cy -= gapS;
 
-    cy -= 78;
-    const phoneY = cy + 46;
+    cy -= 78 * textScale;
+    const phoneY = cy + 46 * textScale;
     cy -= gapM;
 
-    const ctaH = 90;
+    const ctaH = 90 * textScale;
     cy -= ctaH;
     const ctaY = cy;
     cy -= gapM;
 
     let styleLineY = null;
     if (showStyleLine) {
-      cy -= 36;
-      styleLineY = cy + 26;
+      cy -= 36 * textScale;
+      styleLineY = cy + 26 * textScale;
       cy -= gapS;
     }
 
@@ -524,7 +542,7 @@
     const headlineTopMin = textRect.y + 150;
     const headlineMaxH = Math.max(120, headlineBottom - headlineTopMin);
     const lines = [slide.headline[0] || "", slide.headline[1] || "", slide.headline[2] || ""];
-    const baseSize = (dir === "B" ? 90 : dir === "C" ? 80 : 100) * ((slide.headlineScale ?? 100) / 100);
+    const baseSize = (dir === "B" ? 90 : dir === "C" ? 80 : 100) * textScale;
     const fontSize = fitHeadlineFontSize(ctx, lines, textRect.w, headlineMaxH, slide.fontFamily, baseSize);
     const lineH = fontSize * 1.08;
     const headlineTop = headlineBottom - lineH * lines.length;
@@ -549,7 +567,7 @@
       const styleText = slide.styleWords.filter(Boolean).join("  •  ").toUpperCase();
       const pp = entranceParams(t, 1.3, 2.2, "right");
       withEntrance(ctx, textRect.x + textRect.w / 2, styleLineY, pp, () => {
-        ctx.font = "700 26px " + slide.fontFamily;
+        ctx.font = `700 ${Math.round(26 * textScale)}px ` + slide.fontFamily;
         ctx.fillStyle = slide.textSecondaryColor;
         ctx.textAlign = "left";
         ctx.fillText(styleText, textRect.x, styleLineY);
@@ -563,12 +581,12 @@
 
     const pPhone = entranceParams(t, 2.3, 3.4, "left");
     withEntrance(ctx, textRect.x + textRect.w / 2, phoneY, pPhone, () => {
-      drawPhoneRow(ctx, slide, textRect.x, phoneY, textRect.w);
+      drawPhoneRow(ctx, slide, textRect.x, phoneY, textRect.w, textScale);
     });
 
     const pLoc = entranceParams(t, 2.3, 3.4, "right");
     withEntrance(ctx, textRect.x + textRect.w / 2, locationY, pLoc, () => {
-      ctx.font = "600 26px " + slide.fontFamily;
+      ctx.font = `600 ${Math.round(26 * textScale)}px ` + slide.fontFamily;
       ctx.fillStyle = slide.textSecondaryColor;
       ctx.textAlign = "left";
       ctx.fillText((slide.location || "").toUpperCase(), textRect.x, locationY);
@@ -576,7 +594,7 @@
 
     const pFooter = entranceParams(t, 2.3, 3.4, "bottom", 60, 0);
     withEntrance(ctx, textRect.x + textRect.w / 2, footerY, pFooter, () => {
-      drawFooter(ctx, slide, textRect.x, footerY, textRect.w);
+      drawFooter(ctx, slide, textRect.x, footerY, textRect.w, textScale);
     });
 
     if (slide.specialInfo) {
@@ -786,14 +804,20 @@
     bindSimple("brandOffsetY", (s, el) => (s.brandOffsetY = Number(el.value)));
     bindSimple("headlineScale", (s, el) => (s.headlineScale = Number(el.value)));
 
-    $("fontSelect").addEventListener("change", (e) => {
+    $("fontSelect").addEventListener("change", async (e) => {
       if (e.target.value === "custom") {
         $("customFontInput").click();
-      } else {
-        cur().fontFamily = e.target.value;
-        $("customFontStatus").textContent = "";
-        commit();
+        return;
       }
+      cur().fontFamily = e.target.value;
+      $("customFontStatus").textContent = "";
+      commit();
+      if (document.fonts && document.fonts.load) {
+        try {
+          await document.fonts.load("700 24px " + e.target.value);
+        } catch (err) {}
+      }
+      commit();
     });
     $("customFontInput").addEventListener("change", async (e) => {
       const file = e.target.files[0];
@@ -1174,11 +1198,32 @@
     }
   }
 
+  const BRAND_FONTS = ['700 24px "Bebas Neue"', '700 24px "Anton"', '700 24px "Oswald"'];
+  function preloadBrandFonts() {
+    if (!document.fonts || !document.fonts.load) return Promise.resolve();
+    return Promise.all(BRAND_FONTS.map((f) => document.fonts.load(f).catch(() => null)));
+  }
+
   (async function init() {
     await restoreAutosave();
     initBindings();
     loadSlideIntoForm(cur());
     render();
     renderSlidesStrip();
+
+    // Google Fonts load asynchronously; canvas text measured/centered before a
+    // font finishes loading can render with mismatched metrics (e.g. a button
+    // label rendered off-center, clipped on one side). Re-render once every
+    // brand font is confirmed ready, and again on the generic fonts.ready
+    // signal as a safety net for slow connections.
+    await preloadBrandFonts();
+    render();
+    refreshCurrentThumbnail();
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        render();
+        refreshCurrentThumbnail();
+      });
+    }
   })();
 })();
