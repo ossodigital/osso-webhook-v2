@@ -87,7 +87,11 @@
       textColor: "#f4fff9",
       textSecondaryColor: "#7fa596",
       logoDataUrl: null,
-      fontFamily: "'Arial Narrow', 'Arial Black', sans-serif",
+      logoScale: 100,
+      logoOffsetX: 0,
+      logoOffsetY: 0,
+      logoFrame: true,
+      fontFamily: "'Bebas Neue', Impact, 'Arial Narrow', sans-serif",
       headline: ["ARTE", "QUE IMPÕE", "RESPEITO."],
       styleWords: ["SAMURAI", "REALISMO", "COBERTURA"],
       brandName: "TATTOO ATÉ OS OSSOS",
@@ -346,24 +350,26 @@
 
   // ---------- header / commercial block ----------
   function drawHeader(ctx, slide, x, y, maxWidth) {
-    const logoSize = 92;
+    const logoSize = 92 * ((slide.logoScale ?? 100) / 100);
+    const logoX = x + (slide.logoOffsetX ?? 0);
+    const logoY = y + (slide.logoOffsetY ?? 0);
     const logoImg = logoImages.get(slide.id);
     let textX = x;
     if (logoImg || slide.logoDataUrl) {
       ctx.save();
       ctx.beginPath();
-      ctx.rect(x, y, logoSize, logoSize);
+      ctx.rect(logoX, logoY, logoSize, logoSize);
       ctx.clip();
       ctx.fillStyle = "rgba(255,255,255,0.03)";
-      ctx.fillRect(x, y, logoSize, logoSize);
+      ctx.fillRect(logoX, logoY, logoSize, logoSize);
       if (logoImg) {
         const s = Math.min(logoSize / logoImg.width, logoSize / logoImg.height) * 0.86;
         const dw = logoImg.width * s, dh = logoImg.height * s;
-        ctx.drawImage(logoImg, x + (logoSize - dw) / 2, y + (logoSize - dh) / 2, dw, dh);
+        ctx.drawImage(logoImg, logoX + (logoSize - dw) / 2, logoY + (logoSize - dh) / 2, dw, dh);
       }
       ctx.restore();
-      drawCornerFrame(ctx, x, y, logoSize, logoSize, slide.accentColor, 18, 2);
-      textX = x + logoSize + 20;
+      if (slide.logoFrame ?? true) drawCornerFrame(ctx, logoX, logoY, logoSize, logoSize, slide.accentColor, 18, 2);
+      textX = Math.max(x, logoX + logoSize + 20);
     }
     const brand = (slide.brandName || "").toUpperCase();
     ctx.fillStyle = slide.accentColor;
@@ -650,10 +656,18 @@
     $("accentColor").value = s.accentColor;
     $("textColor").value = s.textColor;
     $("textSecondaryColor").value = s.textSecondaryColor;
+    $("logoScale").value = s.logoScale ?? 100;
+    $("logoOffsetX").value = s.logoOffsetX ?? 0;
+    $("logoOffsetY").value = s.logoOffsetY ?? 0;
+    $("logoFrame").checked = s.logoFrame ?? true;
     if (s.fontFamily === "'CarouselCustomFont', sans-serif") {
       $("fontSelect").value = "custom";
+      $("customFontStatus").textContent = state.customFontName
+        ? `Fonte personalizada carregada: ${state.customFontName}`
+        : "Fonte personalizada carregada.";
     } else {
       $("fontSelect").value = s.fontFamily;
+      $("customFontStatus").textContent = "";
     }
 
     $("headlineLine1").value = s.headline[0] || "";
@@ -739,12 +753,17 @@
     bindSimple("accentColor", (s, el) => (s.accentColor = el.value));
     bindSimple("textColor", (s, el) => (s.textColor = el.value));
     bindSimple("textSecondaryColor", (s, el) => (s.textSecondaryColor = el.value));
+    bindSimple("logoScale", (s, el) => (s.logoScale = Number(el.value)));
+    bindSimple("logoOffsetX", (s, el) => (s.logoOffsetX = Number(el.value)));
+    bindSimple("logoOffsetY", (s, el) => (s.logoOffsetY = Number(el.value)));
+    bindSimple("logoFrame", (s, el) => (s.logoFrame = el.checked));
 
     $("fontSelect").addEventListener("change", (e) => {
       if (e.target.value === "custom") {
         $("customFontInput").click();
       } else {
         cur().fontFamily = e.target.value;
+        $("customFontStatus").textContent = "";
         commit();
       }
     });
@@ -755,8 +774,10 @@
       reader.onload = async () => {
         const dataUrl = reader.result;
         state.customFontDataUrl = dataUrl;
+        state.customFontName = file.name;
         await registerCustomFont(dataUrl);
         cur().fontFamily = "'CarouselCustomFont', sans-serif";
+        $("customFontStatus").textContent = `Fonte personalizada carregada: ${file.name}`;
         commit();
       };
       reader.readAsDataURL(file);

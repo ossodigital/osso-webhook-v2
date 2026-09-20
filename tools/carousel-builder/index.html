@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Carrossel Builder — Tattoo Até os Ossos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Oswald:wght@500;700&display=swap">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -157,7 +160,7 @@
       </div>
     </details>
 
-    <details>
+    <details open>
       <summary>5 · Identidade visual</summary>
       <p class="hint">Padrão fixo da marca — preto, branco e verde. Evite vermelho/azul para manter a peça dentro do padrão.</p>
       <div class="field grid-2">
@@ -180,20 +183,45 @@
           <input type="color" id="textSecondaryColor" value="#7fa596">
         </div>
       </div>
+
       <div class="field">
-        <label class="btn btn-block" for="logoInput">Enviar logo (fica salva no navegador)</label>
+        <label class="btn btn-block" for="logoInput">Enviar logo do estúdio</label>
         <input type="file" id="logoInput" accept="image/*" hidden>
       </div>
+      <div class="field grid-2">
+        <div>
+          <label>Tamanho do logo</label>
+          <input type="range" id="logoScale" min="50" max="220" value="100">
+        </div>
+        <div>
+          <label><input type="checkbox" id="logoFrame" checked> Moldura ao redor do logo</label>
+        </div>
+      </div>
+      <div class="field grid-2">
+        <div>
+          <label>Ajuste horizontal do logo</label>
+          <input type="range" id="logoOffsetX" min="-40" max="200" value="0">
+        </div>
+        <div>
+          <label>Ajuste vertical do logo</label>
+          <input type="range" id="logoOffsetY" min="-40" max="150" value="0">
+        </div>
+      </div>
+
       <div class="field">
         <label>Fonte</label>
         <select id="fontSelect">
-          <option value="'Arial Narrow', 'Arial Black', sans-serif">Arial Narrow / Black (condensada)</option>
+          <option value="'Bebas Neue', Impact, 'Arial Narrow', sans-serif">Bebas Neue (alta e condensada)</option>
+          <option value="'Anton', Impact, sans-serif">Anton (bem forte)</option>
+          <option value="'Oswald', 'Arial Narrow', sans-serif">Oswald (condensada)</option>
+          <option value="'Arial Narrow', 'Arial Black', sans-serif">Arial Narrow / Black</option>
           <option value="Impact, 'Arial Narrow', sans-serif">Impact</option>
           <option value="'Segoe UI', Arial, sans-serif">Segoe UI</option>
           <option value="Georgia, serif">Georgia (serifada)</option>
-          <option value="custom">Fonte personalizada (.ttf/.otf/.woff)</option>
+          <option value="custom">Fonte personalizada (.ttf/.otf/.woff)…</option>
         </select>
         <input type="file" id="customFontInput" accept=".ttf,.otf,.woff,.woff2" hidden>
+        <p class="hint" id="customFontStatus"></p>
       </div>
     </details>
 
