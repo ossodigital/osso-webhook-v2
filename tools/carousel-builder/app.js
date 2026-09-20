@@ -945,8 +945,27 @@
       scheduleAutosave();
     }
 
-    // export
-    function triggerDownload(blobOrUrl, filename) {
+    // export — works both as a local file:// page (classic <a download>) and
+    // as a published Artifact, where downloads only leave the sandbox through
+    // the `downloads` capability.
+    let downloadsCapPromise = null;
+    function getDownloadsCapability() {
+      if (!window.claude || typeof window.claude.use !== "function") return Promise.resolve(null);
+      if (!downloadsCapPromise) downloadsCapPromise = window.claude.use("downloads").catch(() => null);
+      return downloadsCapPromise;
+    }
+
+    async function triggerDownload(blobOrUrl, filename) {
+      const downloads = await getDownloadsCapability();
+      if (downloads) {
+        const data = typeof blobOrUrl === "string" ? dataUrlToBlob(blobOrUrl) : blobOrUrl;
+        try {
+          await downloads.save({ filename, data });
+        } catch (e) {
+          if (e && e.code !== "declined") console.warn("Falha ao salvar arquivo:", e);
+        }
+        return;
+      }
       const a = document.createElement("a");
       a.href = typeof blobOrUrl === "string" ? blobOrUrl : URL.createObjectURL(blobOrUrl);
       a.download = filename;
@@ -963,18 +982,16 @@
       }, "image/png");
     });
 
-    $("downloadAllBtn").addEventListener("click", () => {
+    $("downloadAllBtn").addEventListener("click", async () => {
       const fmt = FORMATS[state.format];
-      state.slides.forEach((s, i) => {
-        setTimeout(() => {
-          const off = document.createElement("canvas");
-          off.width = fmt.w; off.height = fmt.h;
-          renderFrame(off.getContext("2d"), s, fmt.w, fmt.h, null);
-          off.toBlob((blob) => {
-            triggerDownload(blob, `${slugify(s.brandName)}_slide${i + 1}.png`);
-          }, "image/png");
-        }, i * 350);
-      });
+      for (let i = 0; i < state.slides.length; i++) {
+        const s = state.slides[i];
+        const off = document.createElement("canvas");
+        off.width = fmt.w; off.height = fmt.h;
+        renderFrame(off.getContext("2d"), s, fmt.w, fmt.h, null);
+        const blob = await new Promise((resolve) => off.toBlob(resolve, "image/png"));
+        await triggerDownload(blob, `${slugify(s.brandName)}_slide${i + 1}.png`);
+      }
     });
 
     function pickVideoMime() {
@@ -1004,30 +1021,19 @@
       recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
 
       $("videoProgressWrap").classList.remove("hidden");
-      $("videoDownloadLink").classList.add("hidden");
       $("generateVideoBtn").disabled = true;
 
       let coverDataUrl = null;
 
-      recorder.onstop = () => {
+      recorder.onstop = async () => {
         const ext = (mime || "video/webm").includes("mp4") ? "mp4" : "webm";
         const blob = new Blob(chunks, { type: mime || "video/webm" });
-        const url = URL.createObjectURL(blob);
         const s = cur();
         const filename = `tattoo-ate-os-ossos_${slugify(s.styleWords[0] || s.workType)}_${slugify(s.headline[0])}_reel.${ext}`;
-        const link = $("videoDownloadLink");
-        link.href = url;
-        link.download = filename;
-        link.textContent = "Baixar vídeo gerado (" + ext.toUpperCase() + ")";
-        link.classList.remove("hidden");
-        triggerDownload(url, filename);
 
+        await triggerDownload(blob, filename);
         if (coverDataUrl) {
-          const coverBlob = dataUrlToBlob(coverDataUrl);
-          const coverUrl = URL.createObjectURL(coverBlob);
-          setTimeout(() => {
-            triggerDownload(coverUrl, filename.replace(/\.(mp4|webm)$/, "_capa.png"));
-          }, 400);
+          await triggerDownload(dataUrlToBlob(coverDataUrl), filename.replace(/\.(mp4|webm)$/, "_capa.png"));
         }
 
         $("videoProgressWrap").classList.add("hidden");
