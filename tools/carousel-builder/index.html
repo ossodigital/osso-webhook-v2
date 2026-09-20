@@ -184,44 +184,72 @@
         </div>
       </div>
 
-      <div class="field">
-        <label class="btn btn-block" for="logoInput">Enviar logo do estúdio</label>
-        <input type="file" id="logoInput" accept="image/*" hidden>
-      </div>
-      <div class="field grid-2">
-        <div>
-          <label>Tamanho do logo</label>
-          <input type="range" id="logoScale" min="50" max="220" value="100">
+      <div class="subgroup">
+        <p class="subgroup-title">Logo (independente do texto)</p>
+        <div class="field">
+          <label class="btn btn-block" for="logoInput">Enviar logo do estúdio</label>
+          <input type="file" id="logoInput" accept="image/*" hidden>
         </div>
-        <div>
-          <label><input type="checkbox" id="logoFrame" checked> Moldura ao redor do logo</label>
+        <div class="field grid-2">
+          <div>
+            <label>Tamanho do logo</label>
+            <input type="range" id="logoScale" min="30" max="300" value="100">
+          </div>
+          <div>
+            <label><input type="checkbox" id="logoFrame" checked> Moldura ao redor do logo</label>
+          </div>
         </div>
-      </div>
-      <div class="field grid-2">
-        <div>
-          <label>Ajuste horizontal do logo</label>
-          <input type="range" id="logoOffsetX" min="-40" max="200" value="0">
-        </div>
-        <div>
-          <label>Ajuste vertical do logo</label>
-          <input type="range" id="logoOffsetY" min="-40" max="150" value="0">
+        <div class="field grid-2">
+          <div>
+            <label>Posição horizontal do logo</label>
+            <input type="range" id="logoOffsetX" min="-40" max="400" value="0">
+          </div>
+          <div>
+            <label>Posição vertical do logo</label>
+            <input type="range" id="logoOffsetY" min="-40" max="400" value="0">
+          </div>
         </div>
       </div>
 
-      <div class="field">
-        <label>Fonte</label>
-        <select id="fontSelect">
-          <option value="'Bebas Neue', Impact, 'Arial Narrow', sans-serif">Bebas Neue (alta e condensada)</option>
-          <option value="'Anton', Impact, sans-serif">Anton (bem forte)</option>
-          <option value="'Oswald', 'Arial Narrow', sans-serif">Oswald (condensada)</option>
-          <option value="'Arial Narrow', 'Arial Black', sans-serif">Arial Narrow / Black</option>
-          <option value="Impact, 'Arial Narrow', sans-serif">Impact</option>
-          <option value="'Segoe UI', Arial, sans-serif">Segoe UI</option>
-          <option value="Georgia, serif">Georgia (serifada)</option>
-          <option value="custom">Fonte personalizada (.ttf/.otf/.woff)…</option>
-        </select>
-        <input type="file" id="customFontInput" accept=".ttf,.otf,.woff,.woff2" hidden>
-        <p class="hint" id="customFontStatus"></p>
+      <div class="subgroup">
+        <p class="subgroup-title">Nome da marca (texto solto, separado do logo)</p>
+        <div class="field grid-2">
+          <div>
+            <label>Tamanho do texto</label>
+            <input type="range" id="brandFontSize" min="12" max="48" value="24">
+          </div>
+          <div>
+            <label><input type="checkbox" id="brandVisible" checked> Mostrar nome da marca</label>
+          </div>
+        </div>
+        <div class="field grid-2">
+          <div>
+            <label>Posição horizontal do texto</label>
+            <input type="range" id="brandOffsetX" min="-40" max="400" value="0">
+          </div>
+          <div>
+            <label>Posição vertical do texto</label>
+            <input type="range" id="brandOffsetY" min="-40" max="400" value="0">
+          </div>
+        </div>
+      </div>
+
+      <div class="subgroup">
+        <p class="subgroup-title">Fonte</p>
+        <div class="field">
+          <select id="fontSelect">
+            <option value="'Bebas Neue', Impact, 'Arial Narrow', sans-serif">Bebas Neue (alta e condensada)</option>
+            <option value="'Anton', Impact, sans-serif">Anton (bem forte)</option>
+            <option value="'Oswald', 'Arial Narrow', sans-serif">Oswald (condensada)</option>
+            <option value="'Arial Narrow', 'Arial Black', sans-serif">Arial Narrow / Black</option>
+            <option value="Impact, 'Arial Narrow', sans-serif">Impact</option>
+            <option value="'Segoe UI', Arial, sans-serif">Segoe UI</option>
+            <option value="Georgia, serif">Georgia (serifada)</option>
+            <option value="custom">Fonte personalizada (.ttf/.otf/.woff)…</option>
+          </select>
+          <input type="file" id="customFontInput" accept=".ttf,.otf,.woff,.woff2" hidden>
+          <p class="hint" id="customFontStatus"></p>
+        </div>
       </div>
     </details>
 
@@ -238,6 +266,10 @@
       <div class="field">
         <label>Headline — linha 3 (verde, palavra de impacto)</label>
         <input type="text" id="headlineLine3" value="RESPEITO.">
+      </div>
+      <div class="field">
+        <label>Tamanho do título</label>
+        <input type="range" id="headlineScale" min="50" max="160" value="100">
       </div>
       <div class="field">
         <button class="btn btn-ghost" id="suggestHeadlineBtn">Sugerir headline pelo tipo do trabalho</button>

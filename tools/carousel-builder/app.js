@@ -91,6 +91,11 @@
       logoOffsetX: 0,
       logoOffsetY: 0,
       logoFrame: true,
+      brandVisible: true,
+      brandFontSize: 24,
+      brandOffsetX: 0,
+      brandOffsetY: 0,
+      headlineScale: 100,
       fontFamily: "'Bebas Neue', Impact, 'Arial Narrow', sans-serif",
       headline: ["ARTE", "QUE IMPÕE", "RESPEITO."],
       styleWords: ["SAMURAI", "REALISMO", "COBERTURA"],
@@ -349,36 +354,44 @@
   }
 
   // ---------- header / commercial block ----------
-  function drawHeader(ctx, slide, x, y, maxWidth) {
+  // Logo and brand-name text are two fully independent elements: each has
+  // its own size/position, neither one shifts to make room for the other.
+  function drawLogo(ctx, slide, x, y) {
+    const logoImg = logoImages.get(slide.id);
+    if (!logoImg && !slide.logoDataUrl) return;
     const logoSize = 92 * ((slide.logoScale ?? 100) / 100);
     const logoX = x + (slide.logoOffsetX ?? 0);
     const logoY = y + (slide.logoOffsetY ?? 0);
-    const logoImg = logoImages.get(slide.id);
-    let textX = x;
-    if (logoImg || slide.logoDataUrl) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(logoX, logoY, logoSize, logoSize);
-      ctx.clip();
-      ctx.fillStyle = "rgba(255,255,255,0.03)";
-      ctx.fillRect(logoX, logoY, logoSize, logoSize);
-      if (logoImg) {
-        const s = Math.min(logoSize / logoImg.width, logoSize / logoImg.height) * 0.86;
-        const dw = logoImg.width * s, dh = logoImg.height * s;
-        ctx.drawImage(logoImg, logoX + (logoSize - dw) / 2, logoY + (logoSize - dh) / 2, dw, dh);
-      }
-      ctx.restore();
-      if (slide.logoFrame ?? true) drawCornerFrame(ctx, logoX, logoY, logoSize, logoSize, slide.accentColor, 18, 2);
-      textX = Math.max(x, logoX + logoSize + 20);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(logoX, logoY, logoSize, logoSize);
+    ctx.clip();
+    ctx.fillStyle = "rgba(255,255,255,0.03)";
+    ctx.fillRect(logoX, logoY, logoSize, logoSize);
+    if (logoImg) {
+      const s = Math.min(logoSize / logoImg.width, logoSize / logoImg.height) * 0.86;
+      const dw = logoImg.width * s, dh = logoImg.height * s;
+      ctx.drawImage(logoImg, logoX + (logoSize - dw) / 2, logoY + (logoSize - dh) / 2, dw, dh);
     }
+    ctx.restore();
+    if (slide.logoFrame ?? true) drawCornerFrame(ctx, logoX, logoY, logoSize, logoSize, slide.accentColor, 18, 2);
+  }
+
+  function drawBrandName(ctx, slide, x, y, maxWidth) {
+    if (slide.brandVisible === false) return;
     const brand = (slide.brandName || "").toUpperCase();
+    if (!brand) return;
+    const size = slide.brandFontSize ?? 24;
+    const textX = x + (slide.brandOffsetX ?? 0);
+    const textY = y + (slide.brandOffsetY ?? 0);
     ctx.fillStyle = slide.accentColor;
-    ctx.fillRect(textX, y + 8, 26, 3);
+    ctx.fillRect(textX, textY + size * 0.33, 26, 3);
     ctx.fillStyle = slide.textColor;
-    ctx.font = "700 24px " + slide.fontFamily;
+    const font = `700 ${size}px ` + slide.fontFamily;
+    ctx.font = font;
     ctx.textAlign = "left";
-    const brandLines = wrapWords(ctx, brand, Math.max(80, maxWidth - (textX - x)), "700 24px " + slide.fontFamily);
-    brandLines.slice(0, 2).forEach((l, i) => ctx.fillText(l, textX, y + 40 + i * 28));
+    const brandLines = wrapWords(ctx, brand, maxWidth, font);
+    brandLines.slice(0, 2).forEach((l, i) => ctx.fillText(l, textX, textY + size * 1.35 + i * size * 1.15));
   }
 
   function ctaLabel(slide) {
@@ -466,10 +479,15 @@
       hexAlpha(slide.accentColor, 0.85)
     );
 
-    // header
+    // header — logo and brand name are independent elements, positioned separately
     let p = entranceParams(t, 0.1, 0.9, "top");
     withEntrance(ctx, textRect.x + 46, textRect.y + 46, p, () => {
-      drawHeader(ctx, slide, textRect.x, textRect.y, textRect.w);
+      drawLogo(ctx, slide, textRect.x, textRect.y);
+    });
+    let pBrand = entranceParams(t, 0.1, 0.9, "top");
+    withEntrance(ctx, textRect.x + 46, textRect.y + 46, pBrand, () => {
+      const maxWidth = Math.max(80, textRect.w - (slide.brandOffsetX ?? 0));
+      drawBrandName(ctx, slide, textRect.x, textRect.y, maxWidth);
     });
 
     // bottom-anchored commercial stack
@@ -506,7 +524,7 @@
     const headlineTopMin = textRect.y + 150;
     const headlineMaxH = Math.max(120, headlineBottom - headlineTopMin);
     const lines = [slide.headline[0] || "", slide.headline[1] || "", slide.headline[2] || ""];
-    const baseSize = dir === "B" ? 90 : dir === "C" ? 80 : 100;
+    const baseSize = (dir === "B" ? 90 : dir === "C" ? 80 : 100) * ((slide.headlineScale ?? 100) / 100);
     const fontSize = fitHeadlineFontSize(ctx, lines, textRect.w, headlineMaxH, slide.fontFamily, baseSize);
     const lineH = fontSize * 1.08;
     const headlineTop = headlineBottom - lineH * lines.length;
@@ -660,6 +678,11 @@
     $("logoOffsetX").value = s.logoOffsetX ?? 0;
     $("logoOffsetY").value = s.logoOffsetY ?? 0;
     $("logoFrame").checked = s.logoFrame ?? true;
+    $("brandFontSize").value = s.brandFontSize ?? 24;
+    $("brandVisible").checked = s.brandVisible ?? true;
+    $("brandOffsetX").value = s.brandOffsetX ?? 0;
+    $("brandOffsetY").value = s.brandOffsetY ?? 0;
+    $("headlineScale").value = s.headlineScale ?? 100;
     if (s.fontFamily === "'CarouselCustomFont', sans-serif") {
       $("fontSelect").value = "custom";
       $("customFontStatus").textContent = state.customFontName
@@ -757,6 +780,11 @@
     bindSimple("logoOffsetX", (s, el) => (s.logoOffsetX = Number(el.value)));
     bindSimple("logoOffsetY", (s, el) => (s.logoOffsetY = Number(el.value)));
     bindSimple("logoFrame", (s, el) => (s.logoFrame = el.checked));
+    bindSimple("brandFontSize", (s, el) => (s.brandFontSize = Number(el.value)));
+    bindSimple("brandVisible", (s, el) => (s.brandVisible = el.checked));
+    bindSimple("brandOffsetX", (s, el) => (s.brandOffsetX = Number(el.value)));
+    bindSimple("brandOffsetY", (s, el) => (s.brandOffsetY = Number(el.value)));
+    bindSimple("headlineScale", (s, el) => (s.headlineScale = Number(el.value)));
 
     $("fontSelect").addEventListener("change", (e) => {
       if (e.target.value === "custom") {
