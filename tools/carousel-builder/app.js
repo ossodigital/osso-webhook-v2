@@ -94,7 +94,7 @@
       brandVisible: true,
       brandFontSize: 24,
       brandOffsetX: 0,
-      brandOffsetY: 0,
+      brandOffsetY: 112,
       headlineScale: 120,
       fontFamily: "'Bebas Neue', Impact, 'Arial Narrow', sans-serif",
       headline: ["ARTE", "QUE IMPÕE", "RESPEITO."],
@@ -383,7 +383,7 @@
     if (!brand) return;
     const size = slide.brandFontSize ?? 24;
     const textX = x + (slide.brandOffsetX ?? 0);
-    const textY = y + (slide.brandOffsetY ?? 0);
+    const textY = y + (slide.brandOffsetY ?? 112);
     ctx.fillStyle = slide.accentColor;
     ctx.fillRect(textX, textY + size * 0.33, 26, 3);
     ctx.fillStyle = slide.textColor;
@@ -509,7 +509,14 @@
     // allotted box heights together so bigger text never collides with
     // its neighbors in the stack.
     const showStyleLine = dir !== "C";
-    const textScale = (slide.headlineScale ?? 100) / 100;
+    // The commercial stack is tuned against the "feed" (1080x1350) frame.
+    // A taller/shorter canvas — the story format, or the video export, which
+    // is always 1080x1920 regardless of the chosen static format — must grow
+    // or shrink the same stack proportionally, or text ends up looking too
+    // small (lots of empty space) or cramped. Clamped so a very tall/short
+    // frame can't blow past what still fits the constant 1080px width.
+    const heightScale = clamp(H / 1350, 0.85, 1.15);
+    const textScale = ((slide.headlineScale ?? 100) / 100) * heightScale;
     const gapS = 14 * textScale, gapM = 26 * textScale;
     let cy = textRect.y + textRect.h;
 
@@ -699,7 +706,7 @@
     $("brandFontSize").value = s.brandFontSize ?? 24;
     $("brandVisible").checked = s.brandVisible ?? true;
     $("brandOffsetX").value = s.brandOffsetX ?? 0;
-    $("brandOffsetY").value = s.brandOffsetY ?? 0;
+    $("brandOffsetY").value = s.brandOffsetY ?? 112;
     $("headlineScale").value = s.headlineScale ?? 100;
     if (s.fontFamily === "'CarouselCustomFont', sans-serif") {
       $("fontSelect").value = "custom";
