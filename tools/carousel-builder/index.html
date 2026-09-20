@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carrossel Builder — Tattoo Até os Ossos</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <h1>Carrossel Builder <span>ferramenta local, offline — segue o Prompt Mestre da marca</span></h1>
+  <div class="topbar-actions">
+    <label class="btn btn-ghost" title="Carregar projeto salvo (.json)">
+      Abrir projeto
+      <input type="file" id="loadProjectInput" accept="application/json" hidden>
+    </label>
+    <button class="btn btn-ghost" id="saveProjectBtn">Salvar projeto</button>
+    <button class="btn btn-primary" id="downloadAllBtn">Baixar todas as capas (PNG)</button>
+  </div>
+</header>
+
+<div class="app">
+
+  <main class="stage">
+    <div class="stage-canvas-wrap">
+      <canvas id="previewCanvas"></canvas>
+    </div>
+
+    <div class="video-progress hidden" id="videoProgressWrap">
+      <div class="video-progress-bar"><div id="videoProgressFill"></div></div>
+      <span id="videoProgressLabel">Gravando vídeo… não feche esta aba</span>
+    </div>
+
+    <div class="slides-strip" id="slidesStrip"></div>
+    <div class="slides-strip-actions">
+      <button class="btn btn-ghost" id="addSlideBtn">+ Novo slide</button>
+      <button class="btn btn-ghost" id="duplicateSlideBtn">Duplicar</button>
+      <button class="btn btn-ghost" id="moveLeftBtn">◀ Mover</button>
+      <button class="btn btn-ghost" id="moveRightBtn">Mover ▶</button>
+      <button class="btn btn-danger" id="deleteSlideBtn">Excluir slide</button>
+    </div>
+    <div class="slides-strip-actions">
+      <button class="btn btn-primary" id="downloadOneBtn">Baixar capa deste slide (PNG)</button>
+      <button class="btn btn-primary" id="generateVideoBtn">🎬 Gerar vídeo deste slide (8s)</button>
+      <a id="videoDownloadLink" class="btn btn-ghost hidden" download>Baixar vídeo gerado</a>
+    </div>
+  </main>
+
+  <aside class="panel">
+
+    <details open>
+      <summary>1 · Formato</summary>
+      <div class="field">
+        <label>Proporção da capa/carrossel (o vídeo é sempre 1080×1920)</label>
+        <select id="formatSelect">
+          <option value="story">Story / Reels — 1080×1920 (9:16)</option>
+          <option value="feed" selected>Feed vertical — 1080×1350 (4:5)</option>
+          <option value="square">Quadrado — 1080×1080 (1:1)</option>
+        </select>
+      </div>
+    </details>
+
+    <details open>
+      <summary>2 · Direção criativa</summary>
+      <div class="field">
+        <div class="layout-options" id="directionOptions">
+          <button class="layout-option" data-direction="A">A<br>Impacto cinematográfico</button>
+          <button class="layout-option" data-direction="B">B<br>Autoral, movimento controlado</button>
+          <button class="layout-option" data-direction="C">C<br>Portfólio minimalista</button>
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>3 · Entradas variáveis</summary>
+      <div class="field">
+        <label>Tipo do trabalho</label>
+        <select id="workTypeSelect">
+          <option value="inferir">Inferir pela imagem</option>
+          <option value="cobertura">Cobertura</option>
+          <option value="fechamento">Fechamento</option>
+          <option value="floral">Floral</option>
+          <option value="realismo">Realismo</option>
+          <option value="black-grey">Black and grey</option>
+          <option value="colorido">Colorido</option>
+          <option value="autoral">Autoral</option>
+          <option value="outro">Outro…</option>
+        </select>
+        <input type="text" id="workTypeCustom" class="hidden" placeholder="Descreva o tipo do trabalho">
+      </div>
+      <div class="field">
+        <label>Objetivo do post</label>
+        <select id="objectiveSelect">
+          <option value="portfolio">Portfólio</option>
+          <option value="orcamento">Orçamento</option>
+          <option value="autoridade">Autoridade</option>
+          <option value="agenda">Agenda</option>
+          <option value="projeto-exclusivo">Projeto exclusivo</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Intensidade do zoom (usada no vídeo)</label>
+        <select id="zoomIntensitySelect">
+          <option value="forte" selected>Forte — padrão (~28%)</option>
+          <option value="medio">Médio (~15%)</option>
+          <option value="leve">Leve (~8%)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Informação especial (opcional)</label>
+        <input type="text" id="specialInfoInput" placeholder="Ex: sessão única de 6h">
+      </div>
+      <div class="field">
+        <label>Texto obrigatório adicional (opcional)</label>
+        <input type="text" id="extraTextInput" placeholder="Aparece como observação extra na peça">
+      </div>
+    </details>
+
+    <details open>
+      <summary>4 · Mídia (foto ou vídeo)</summary>
+      <div class="field">
+        <label class="btn btn-block" for="mediaInput">Escolher foto ou vídeo do dispositivo</label>
+        <input type="file" id="mediaInput" accept="image/*,video/*" hidden>
+        <div id="videoFrameControls" class="hidden">
+          <label>Escolher o quadro do vídeo</label>
+          <input type="range" id="videoScrub" min="0" max="1" step="0.01" value="0">
+          <button class="btn btn-ghost" id="captureFrameBtn">Capturar este quadro</button>
+        </div>
+      </div>
+      <div class="field grid-2">
+        <div>
+          <label>Zoom base (capa)</label>
+          <input type="range" id="mediaZoom" min="100" max="300" value="110">
+        </div>
+        <div>
+          <label>Filtro</label>
+          <select id="mediaFilter">
+            <option value="none">Nenhum</option>
+            <option value="grayscale">Preto e branco</option>
+            <option value="duotone">Duotone (cor de destaque)</option>
+          </select>
+        </div>
+      </div>
+      <div class="field grid-2">
+        <div>
+          <label>Posição horizontal</label>
+          <input type="range" id="mediaOffsetX" min="-100" max="100" value="0">
+        </div>
+        <div>
+          <label>Posição vertical</label>
+          <input type="range" id="mediaOffsetY" min="-100" max="100" value="0">
+        </div>
+      </div>
+      <div class="field">
+        <label>Intensidade da vinheta</label>
+        <input type="range" id="vignetteIntensity" min="0" max="100" value="40">
+      </div>
+    </details>
+
+    <details>
+      <summary>5 · Identidade visual</summary>
+      <p class="hint">Padrão fixo da marca — preto, branco e verde. Evite vermelho/azul para manter a peça dentro do padrão.</p>
+      <div class="field grid-2">
+        <div>
+          <label>Fundo</label>
+          <input type="color" id="bgColor" value="#020c08">
+        </div>
+        <div>
+          <label>Verde institucional</label>
+          <input type="color" id="accentColor" value="#38f49b">
+        </div>
+      </div>
+      <div class="field grid-2">
+        <div>
+          <label>Texto principal</label>
+          <input type="color" id="textColor" value="#f4fff9">
+        </div>
+        <div>
+          <label>Texto secundário</label>
+          <input type="color" id="textSecondaryColor" value="#7fa596">
+        </div>
+      </div>
+      <div class="field">
+        <label class="btn btn-block" for="logoInput">Enviar logo (fica salva no navegador)</label>
+        <input type="file" id="logoInput" accept="image/*" hidden>
+      </div>
+      <div class="field">
+        <label>Fonte</label>
+        <select id="fontSelect">
+          <option value="'Arial Narrow', 'Arial Black', sans-serif">Arial Narrow / Black (condensada)</option>
+          <option value="Impact, 'Arial Narrow', sans-serif">Impact</option>
+          <option value="'Segoe UI', Arial, sans-serif">Segoe UI</option>
+          <option value="Georgia, serif">Georgia (serifada)</option>
+          <option value="custom">Fonte personalizada (.ttf/.otf/.woff)</option>
+        </select>
+        <input type="file" id="customFontInput" accept=".ttf,.otf,.woff,.woff2" hidden>
+      </div>
+    </details>
+
+    <details open>
+      <summary>6 · Copy</summary>
+      <div class="field">
+        <label>Headline — linha 1 (branca)</label>
+        <input type="text" id="headlineLine1" value="ARTE">
+      </div>
+      <div class="field">
+        <label>Headline — linha 2 (branca)</label>
+        <input type="text" id="headlineLine2" value="QUE IMPÕE">
+      </div>
+      <div class="field">
+        <label>Headline — linha 3 (verde, palavra de impacto)</label>
+        <input type="text" id="headlineLine3" value="RESPEITO.">
+      </div>
+      <div class="field">
+        <button class="btn btn-ghost" id="suggestHeadlineBtn">Sugerir headline pelo tipo do trabalho</button>
+      </div>
+      <div class="field">
+        <label>Linha descritiva — ESTILO • TÉCNICA • TIPO</label>
+        <div class="grid-3">
+          <input type="text" id="styleWord1" value="SAMURAI">
+          <input type="text" id="styleWord2" value="REALISMO">
+          <input type="text" id="styleWord3" value="COBERTURA">
+        </div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>7 · Bloco comercial fixo</summary>
+      <div class="field">
+        <label>Marca</label>
+        <input type="text" id="brandName" value="TATTOO ATÉ OS OSSOS">
+      </div>
+      <div class="field">
+        <label>CTA principal</label>
+        <select id="ctaSelect">
+          <option value="QUERO MEU ORÇAMENTO">QUERO MEU ORÇAMENTO</option>
+          <option value="QUERO MEU PROJETO">QUERO MEU PROJETO</option>
+          <option value="custom">Personalizado…</option>
+        </select>
+        <input type="text" id="ctaCustom" class="hidden" placeholder="Texto do botão">
+      </div>
+      <div class="field">
+        <label>Telefone</label>
+        <input type="text" id="phoneText" value="(11) 92635-5407">
+      </div>
+      <div class="field">
+        <label>Comando</label>
+        <input type="text" id="commandText" value="Digite: ORÇAMENTO">
+      </div>
+      <div class="field">
+        <label>Localização</label>
+        <input type="text" id="locationText" value="Vila Prudente • São Paulo">
+      </div>
+      <div class="field">
+        <label>Aviso</label>
+        <input type="text" id="noticeText" value="Atendimento somente para maiores de 18 anos">
+      </div>
+      <div class="field">
+        <label><input type="checkbox" id="badgeToggle" checked> Mostrar selo 18+</label>
+      </div>
+    </details>
+
+    <details>
+      <summary>8 · Legenda para publicação</summary>
+      <div class="field">
+        <button class="btn btn-ghost" id="generateCaptionBtn">Gerar legenda automaticamente</button>
+      </div>
+      <div class="field">
+        <textarea id="captionTextarea" rows="10" placeholder="Clique em 'Gerar legenda' ou escreva a sua"></textarea>
+      </div>
+      <div class="field">
+        <label>Hashtags</label>
+        <input type="text" id="hashtagsInput" placeholder="#tattoo #vilaprudente #saopaulo">
+      </div>
+      <div class="field">
+        <button class="btn btn-ghost" id="copyCaptionBtn">Copiar legenda + hashtags</button>
+      </div>
+    </details>
+
+    <details>
+      <summary>9 · Áudio sugerido</summary>
+      <div class="field">
+        <textarea id="audioTextarea" rows="6"></textarea>
+      </div>
+    </details>
+
+  </aside>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
