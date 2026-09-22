@@ -12,7 +12,7 @@ export async function listarLeadsRecentes(limit = 50) {
   return await supabase
     .from("leads")
     .select("*")
-    .order("created_at", { ascending: false })
+    .order("updated_at", { ascending: false })
     .limit(limit);
 }
 

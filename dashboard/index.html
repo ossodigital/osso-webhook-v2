@@ -1944,7 +1944,7 @@ function atualizarHeaderLead(lead) {
     `${escaparHTML(lead.name || "Sem nome")} — ${escaparHTML(lead.phone)}`;
 
   chatSubtitle.innerHTML =
-    `<span class="lead-stage ${escaparHTML(stage)}">${escaparHTML(stage)}</span>` +
+    `Stage comercial: <span class="lead-stage ${escaparHTML(stage)}">${escaparHTML(stage)}</span>` +
     `<span class="lead-ownership ${escaparHTML(ownership.css)}">${escaparHTML(ownership.label)}</span>` +
     (lead.last_message ? ` <span class="chat-subtitle-last">${escaparHTML(lead.last_message)}</span>` : "");
 

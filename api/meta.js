@@ -887,7 +887,11 @@ export default async function handler(req, res) {
     }
 
     if (!leadName) {
-      const nameReply = "Claro! Antes de continuar, como posso te chamar? 😊";
+      const nameReply = mediaType === "image"
+        ? "Recebi sua referência! 📸 Antes de continuar, como posso te chamar?"
+        : mediaType === "audio"
+          ? "Te ouvi! Antes de continuar, como posso te chamar? 😊"
+          : "Claro! Antes de continuar, como posso te chamar? 😊";
       await inserirMensagem({ phone, role: "assistant", content: nameReply });
       await enviarWhatsApp(phone, nameReply);
       return res.status(200).send("ok");
