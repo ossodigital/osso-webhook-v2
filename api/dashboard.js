@@ -3,7 +3,7 @@ import { env } from "../config/env.js";
 import { requireDashboardUser } from "../services/auth/dashboardAuth.js";
 
 const GET_ACTIONS = new Set([
-  "ping", "leads", "messages", "messages-by-phone", "stats",
+  "ping", "leads", "leads-stats", "messages", "messages-by-phone", "stats",
   "team", "sessions", "orcamentos", "financeiro"
 ]);
 const POST_ACTIONS = new Set([

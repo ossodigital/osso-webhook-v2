@@ -27,9 +27,11 @@ import { enviarWhatsApp, enviarWhatsAppAudio, uploadWhatsAppMedia } from "../ser
 import {
   atualizarLeadPorTelefone,
   buscarLeadPorTelefone,
+  contarLeadsPorStage,
   listarLeadsRecentes,
   upsertLead
 } from "../services/supabase/leadsRepository.js";
+import { parseLeadsListParams } from "../services/supabase/leadsQueryParams.js";
 import {
   buscarMensagensMaisRecentesQue,
   inserirMensagem,
@@ -124,8 +126,12 @@ export default async function handler(req, res) {
         if (!validarDashboardToken(req)) {
           return res.status(403).json({ ok: false, error: "Acesso negado" });
         }
-        const { data, error } = await listarLeadsRecentes(50);
+        const { limit, offset, search, stage } = parseLeadsListParams(req.query);
+
+        const startedAt = Date.now();
+        const { data, count, error } = await listarLeadsRecentes({ limit, offset, search, stage });
         if (error) return res.status(500).json({ ok: false, error: error.message });
+
         const phones = (data || []).map((lead) => lead.phone).filter(Boolean);
         const { data: handoffs, error: handoffError } = await listarHandoffsAtivosPorTelefones(phones);
         if (handoffError) console.error("DASHBOARD HANDOFF LIST ERROR:", handoffError?.name || "HandoffReadError");
@@ -135,7 +141,33 @@ export default async function handler(req, res) {
           handoff_status: handoffError ? "UNKNOWN" : byPhone.get(lead.phone)?.status || HANDOFF_STATUS.NONE,
           conversation_owner: handoffError ? "UNKNOWN" : evaluateHandoffRuntime({ status: byPhone.get(lead.phone)?.status }).owner
         }));
-        return res.status(200).json({ ok: true, data: enriched });
+
+        console.log("DASHBOARD LEADS QUERY", {
+          durationMs: Date.now() - startedAt,
+          returned: enriched.length,
+          matchingTotal: count ?? null,
+          limit,
+          offset,
+          hasSearch: Boolean(search),
+          stage: stage || null
+        });
+
+        return res.status(200).json({
+          ok: true,
+          data: enriched,
+          total: count ?? enriched.length,
+          limit,
+          offset
+        });
+      }
+
+      if (req.query.debug === "leads-stats") {
+        if (!validarDashboardToken(req)) {
+          return res.status(403).json({ ok: false, error: "Acesso negado" });
+        }
+        const { data, error } = await contarLeadsPorStage();
+        if (error) return res.status(500).json({ ok: false, error: error.message });
+        return res.status(200).json({ ok: true, data });
       }
 
       if (req.query.debug === "messages") {

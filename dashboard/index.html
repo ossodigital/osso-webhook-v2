@@ -395,6 +395,25 @@
       line-height: 1.35;
     }
 
+    .leads-status {
+      padding: 10px 6px 16px;
+      text-align: center;
+      color: #777;
+      font-size: 12px;
+    }
+    .leads-status.erro { color: #ff8888; }
+    .leads-status button {
+      margin-top: 6px;
+      background: #1c1c1c;
+      border: 1px solid #333;
+      color: #ccc;
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .leads-status button:hover { border-color: #00ff88; color: #00ff88; }
+
     .bubble {
       max-width: 70%;
       padding: 14px;
@@ -1381,6 +1400,7 @@
     </div>
 
     <div id="leads"></div>
+    <div id="leadsStatus" class="leads-status"></div>
 
   </aside>
 
@@ -1627,6 +1647,11 @@
 </div>
 
 <script src="/auth/supabase-auth.js"></script>
+<script type="module">
+  import { mergeLeadsPage, atualizarPrimeiraPagina } from "/dashboard/leadsPagination.js";
+  window.mergeLeadsPage = mergeLeadsPage;
+  window.atualizarPrimeiraPagina = atualizarPrimeiraPagina;
+</script>
 <script>
 
 const API =
@@ -1643,6 +1668,12 @@ const logoutBtn =
 
 const leadsBox =
   document.getElementById("leads");
+
+const leadsStatus =
+  document.getElementById("leadsStatus");
+
+const leadsSidebar =
+  document.querySelector(".sidebar");
 
 const chatTitle =
   document.getElementById("chatTitle");
@@ -1710,6 +1741,17 @@ let selectedPhone = null;
 let lastMessageCount = 0;
 let intervalo = null;
 let imageZoom = 1;
+
+const LEADS_PAGE_SIZE = 50;
+let leadsOffset = 0;
+let leadsTotalMatching = 0;
+let leadsHasMore = true;
+let leadsLoadingMore = false;
+let leadsCarregandoInicial = false;
+let leadsErro = null;
+let buscaAtual = "";
+let stageAtual = "";
+let buscaDebounceTimer = null;
 
 function aplicarZoomImagem() {
   imageViewerImg.style.transform =
@@ -1800,59 +1842,37 @@ function formatarData(data) {
   }
 }
 
-function atualizarMetricas(leads) {
+function atualizarMetricas(stats) {
 
   document.getElementById("mTotal").textContent =
-    leads.length;
+    stats.total ?? 0;
 
   document.getElementById("mHumano").textContent =
-    leads.filter(
-      l => l.conversation_owner === "HUMAN_PENDING" || l.conversation_owner === "HUMAN" || l.stage === "humano"
-    ).length;
+    stats.humano ?? 0;
 
   document.getElementById("mQuente").textContent =
-    leads.filter(
-      l => l.stage === "quente"
-    ).length;
+    stats.quente ?? 0;
 
   document.getElementById("mAgenda").textContent =
-    leads.filter(
-      l => l.stage === "agendamento"
-    ).length;
+    stats.agendamento ?? 0;
 }
 
-function filtrarLeads() {
-
-  const termo =
-    busca.value.toLowerCase().trim();
-
-  const stage =
-    filtroStage.value;
-
-  return leadsCache.filter(lead => {
-
-    const texto =
-      `${lead.phone || ""} ${lead.name || ""} ${lead.last_message || ""}`
-      .toLowerCase();
-
-    const matchBusca =
-      !termo || texto.includes(termo);
-
-    const matchStage =
-      !stage || lead.stage === stage;
-
-    return matchBusca && matchStage;
-  });
+async function carregarLeadsStats() {
+  try {
+    const res = await window.ossoAuth.authorizedFetch(API + "?debug=leads-stats");
+    const data = await res.json();
+    if (!res.ok || !data.ok) return;
+    atualizarMetricas(data.data || {});
+  } catch (err) {
+    console.error("ERRO STATS LEADS:", err);
+  }
 }
 
 function renderLeads() {
 
-  const leads =
-    filtrarLeads();
-
   leadsBox.innerHTML = "";
 
-  leads.forEach(lead => {
+  leadsCache.forEach(lead => {
 
     const ativo =
       selectedPhone === lead.phone
@@ -1892,47 +1912,148 @@ function renderLeads() {
       </div>
     `;
   });
+
+  atualizarLeadsStatusUI();
 }
 
-async function carregarLeads() {
+function atualizarLeadsStatusUI() {
 
-  const res = await window.ossoAuth.authorizedFetch(
-    API + "?debug=leads"
-  );
-
-  const data =
-    await res.json();
-
-  if (!res.ok || !data.ok) {
-
-    statusBox.innerHTML = "🔒 Sessão inválida";
-
+  if (leadsErro) {
+    leadsStatus.className = "leads-status erro";
+    leadsStatus.innerHTML =
+      `Erro ao carregar leads.<br><button type="button" onclick="recarregarLeadsDoZero()">Tentar de novo</button>`;
     return;
   }
 
-  mostrarApp();
+  leadsStatus.className = "leads-status";
 
-  leadsCache =
-    data.data || [];
-
-  atualizarMetricas(leadsCache);
-
-  renderLeads();
-
-  statusBox.innerHTML =
-    "✅ Dashboard conectado e protegido";
-
-  if (selectedPhone) {
-
-    const leadAtual =
-      leadsCache.find(
-        l => l.phone === selectedPhone
-      );
-
-    if (leadAtual) {
-      atualizarHeaderLead(leadAtual);
-    }
+  if (!leadsCache.length) {
+    leadsStatus.textContent = leadsCarregandoInicial ? "Carregando..." : "Nenhum lead encontrado.";
+    return;
   }
+
+  if (leadsLoadingMore) {
+    leadsStatus.textContent = `Carregando mais... (${leadsCache.length} de ${leadsTotalMatching})`;
+    return;
+  }
+
+  if (leadsHasMore) {
+    leadsStatus.innerHTML =
+      `Mostrando ${leadsCache.length} de ${leadsTotalMatching} · <button type="button" onclick="carregarMaisLeads()">Carregar mais</button>`;
+    return;
+  }
+
+  leadsStatus.textContent = `${leadsCache.length} de ${leadsTotalMatching} leads`;
+}
+
+function montarQueryLeads(offset) {
+  const params = new URLSearchParams();
+  params.set("debug", "leads");
+  params.set("limit", String(LEADS_PAGE_SIZE));
+  params.set("offset", String(offset));
+  if (buscaAtual) params.set("search", buscaAtual);
+  if (stageAtual) params.set("stage", stageAtual);
+  return API + "?" + params.toString();
+}
+
+async function recarregarLeadsDoZero() {
+
+  leadsOffset = 0;
+  leadsHasMore = true;
+  leadsErro = null;
+  leadsCarregandoInicial = true;
+  atualizarLeadsStatusUI();
+
+  try {
+    const res = await window.ossoAuth.authorizedFetch(montarQueryLeads(0));
+    const data = await res.json();
+
+    if (!res.ok || !data.ok) {
+      if (res.status === 401 || res.status === 403) {
+        statusBox.innerHTML = "🔒 Sessão inválida";
+        return;
+      }
+      throw new Error(data.error || "Falha ao carregar leads");
+    }
+
+    mostrarApp();
+
+    leadsCache = data.data || [];
+    leadsTotalMatching = data.total ?? leadsCache.length;
+    leadsOffset = leadsCache.length;
+    leadsHasMore = leadsCache.length < leadsTotalMatching;
+
+    statusBox.innerHTML = "✅ Dashboard conectado e protegido";
+
+    if (selectedPhone) {
+      const leadAtual = leadsCache.find(l => l.phone === selectedPhone);
+      if (leadAtual) atualizarHeaderLead(leadAtual);
+    }
+  } catch (err) {
+    console.error("ERRO LEADS:", err);
+    leadsErro = err;
+  } finally {
+    leadsCarregandoInicial = false;
+    renderLeads();
+  }
+}
+
+async function carregarMaisLeads() {
+  if (leadsLoadingMore || !leadsHasMore) return;
+
+  leadsLoadingMore = true;
+  atualizarLeadsStatusUI();
+
+  try {
+    const res = await window.ossoAuth.authorizedFetch(montarQueryLeads(leadsOffset));
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "Falha ao carregar mais leads");
+
+    const novaPagina = data.data || [];
+    leadsCache = window.mergeLeadsPage(leadsCache, novaPagina);
+    leadsTotalMatching = data.total ?? leadsTotalMatching;
+    leadsOffset += novaPagina.length;
+    leadsHasMore = novaPagina.length === LEADS_PAGE_SIZE && leadsCache.length < leadsTotalMatching;
+  } catch (err) {
+    console.error("ERRO CARREGAR MAIS LEADS:", err);
+  } finally {
+    leadsLoadingMore = false;
+    renderLeads();
+  }
+}
+
+async function atualizarLeadsAtivos() {
+  if (leadsCarregandoInicial || leadsLoadingMore) return;
+
+  try {
+    const tamanhoJanela = Math.min(100, Math.max(LEADS_PAGE_SIZE, leadsOffset || LEADS_PAGE_SIZE));
+    const params = new URLSearchParams();
+    params.set("debug", "leads");
+    params.set("limit", String(tamanhoJanela));
+    params.set("offset", "0");
+    if (buscaAtual) params.set("search", buscaAtual);
+    if (stageAtual) params.set("stage", stageAtual);
+
+    const res = await window.ossoAuth.authorizedFetch(API + "?" + params.toString());
+    const data = await res.json();
+    if (!res.ok || !data.ok) return;
+
+    leadsCache = window.atualizarPrimeiraPagina(leadsCache, data.data || []);
+    leadsTotalMatching = data.total ?? leadsTotalMatching;
+    leadsErro = null;
+    renderLeads();
+
+    if (selectedPhone) {
+      const leadAtual = leadsCache.find(l => l.phone === selectedPhone);
+      if (leadAtual) atualizarHeaderLead(leadAtual);
+    }
+  } catch (err) {
+    console.error("ERRO POLL LEADS:", err);
+  }
+}
+
+async function carregarLeads() {
+  await Promise.all([atualizarLeadsAtivos(), carregarLeadsStats()]);
 }
 
 function atualizarHeaderLead(lead) {
@@ -2297,23 +2418,45 @@ msgInput.addEventListener(
 
 busca.addEventListener(
   "input",
-  renderLeads
+  () => {
+    if (buscaDebounceTimer) clearTimeout(buscaDebounceTimer);
+    buscaDebounceTimer = setTimeout(() => {
+      buscaAtual = busca.value.trim();
+      recarregarLeadsDoZero();
+    }, 350);
+  }
 );
 
 filtroStage.addEventListener(
   "change",
-  renderLeads
+  () => {
+    stageAtual = filtroStage.value;
+    recarregarLeadsDoZero();
+  }
 );
 
+if (leadsSidebar) {
+  leadsSidebar.addEventListener("scroll", () => {
+    const distanciaAteOFim =
+      leadsSidebar.scrollHeight - leadsSidebar.scrollTop - leadsSidebar.clientHeight;
+
+    if (distanciaAteOFim < 200) {
+      carregarMaisLeads();
+    }
+  });
+}
+
 function iniciarDashboard() {
-  carregarLeads();
+  recarregarLeadsDoZero();
+  carregarLeadsStats();
 
   if (intervalo) {
     clearInterval(intervalo);
   }
 
   intervalo = setInterval(() => {
-    carregarLeads();
+    atualizarLeadsAtivos();
+    carregarLeadsStats();
 
     if (selectedPhone) {
       carregarConversa(selectedPhone);
