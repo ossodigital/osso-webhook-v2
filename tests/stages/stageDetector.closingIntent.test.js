@@ -7,6 +7,8 @@ const contextosDeProjeto = [
   ["Manga fechada", "novo"],
   ["Quero fechar o braço", "quente"],
   ["Quero fazer o braço fechado", "quente"],
+  ["Quero fechar um braço por fora sabe me ajudar?", "quente"],
+  ["Quero fechar meu braço por fora", "quente"],
   ["Fechamento de braço", "novo"],
   ["Projeto de braço fechado", "novo"]
 ];
@@ -33,3 +35,8 @@ for (const input of intencoesComerciais) {
     assert.equal(detectarStage(input), "humano");
   });
 }
+
+test("classifica curiosidade explícita sem elevar intenção comercial", () => {
+  assert.equal(detectarStage("Só estou pesquisando, sem compromisso"), "curioso");
+  assert.equal(detectarStage("Só queria saber por curiosidade"), "curioso");
+});

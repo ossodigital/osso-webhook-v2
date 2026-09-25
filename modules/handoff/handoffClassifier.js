@@ -1,9 +1,17 @@
-function hasClosingIntent(text) {
+function isProjectScopeExpression(text) {
   const projectContexts = [
     "braço fechado", "braco fechado", "manga fechada", "fechamento de braço",
-    "fechamento de braco", "fechar o braço", "fechar o braco"
+    "fechamento de braco", "fechar o braço", "fechar o braco",
+    "fechar um braço", "fechar um braco", "fechar meu braço", "fechar meu braco",
+    "braço por fora", "braco por fora", "braço por dentro", "braco por dentro"
   ];
-  if (projectContexts.some((context) => text.includes(context))) return false;
+
+  return projectContexts.some((context) => text.includes(context))
+    || /fechar\s+(?:um|o|meu)?\s*(?:bra[cç]o|antebra[cç]o|perna|costas|peito)(?:\s+por\s+(?:fora|dentro))?/iu.test(text);
+}
+
+function hasClosingIntent(text) {
+  if (isProjectScopeExpression(text)) return false;
 
   const withoutFinalPunctuation = text.replace(/[.!?]+$/gu, "").trim();
   if (withoutFinalPunctuation === "fechado") return true;
