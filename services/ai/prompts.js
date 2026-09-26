@@ -1,6 +1,31 @@
 import { buildPilotPromptContext } from "./pilotPrompt.js";
+import {
+  STUDIO_CATALOG,
+  formatBRL,
+  piercingDepositText,
+  piercingPriceTableLines,
+  tattooPriceLines
+} from "../../config/business/catalog.js";
+import { buildOperationalSummary } from "../../modules/attendance/operationalSummary.js";
 
-export function montarPromptSistema(leadName, { imageMode = false, decisionContext = null } = {}) {
+export function buildAttendancePromptContext(attendanceState) {
+  if (!attendanceState) return "";
+  const summary = buildOperationalSummary(attendanceState);
+  const serviceRule = attendanceState.service_type === "piercing"
+    ? "- O assunto atual é PIERCING. Toda pergunta de preço/horário refere-se ao piercing até o cliente mudar explicitamente para tattoo."
+    : attendanceState.service_type === "tattoo"
+      ? "- O assunto atual é TATUAGEM."
+      : "";
+  return `
+
+ESTADO ESTRUTURADO DO ATENDIMENTO (fonte de verdade, vale mais que o histórico curto):
+${summary.fields.map((field) => `- ${field.label}: ${field.value}`).join("\n")}
+${serviceRule}
+- Nunca pergunte de novo algo que já está neste estado.`;
+}
+
+export function montarPromptSistema(leadName, { imageMode = false, decisionContext = null, attendanceState = null } = {}) {
+  const { piercing } = STUDIO_CATALOG;
   const base = `Você é o atendimento oficial do Tattoo Até os Ossos.
 Nome do cliente: ${leadName}
 
@@ -53,10 +78,18 @@ Especialidades do estúdio:
 - Tattoos exclusivas
 
 Piercing:
-- O estúdio também faz piercing, com a Jennyfer (@jennyfertattoopierce).
-- Se o cliente perguntar sobre piercing, confirme que o estúdio faz e diga que vai confirmar com a Jennyfer disponibilidade e valor antes de fechar.
-- Não invente preço ou horário de piercing - isso é confirmado pela Jennyfer.
+- O estúdio também faz piercing, com a ${piercing.professional} (${piercing.instagram}).
+- Tabela oficial de piercing (responda o valor diretamente quando perguntarem):
+${piercingPriceTableLines().map((line) => `  - ${line}`).join("\n")}
+- ${piercingDepositText()}
+- Procedimento fora dessa tabela: não invente valor; diga que esse valor precisa ser confirmado pela equipe.
+- Horário/disponibilidade de piercing não pode ser consultado por você: nunca confirme horário.
+- Quando a conversa for sobre piercing, toda pergunta de preço ("quanto custa", "qual a média", "valor") é sobre PIERCING. Nunca responda com valores de tatuagem.
 - Não trate a pergunta sobre piercing como se fosse sobre tatuagem.
+
+Promessas proibidas:
+- Nunca diga que vai consultar, verificar, confirmar com alguém, "já te retorno", "ela vai te responder" ou "estou verificando". Você não executa essas ações.
+- Se você tem o dado (tabelas deste prompt), responda direto. Se não tem, diga com clareza o que precisa ser confirmado pela equipe.
 
 Localização:
 - Estúdio: Tattoo Até os Ossos, Vila Prudente, São Paulo - SP
@@ -72,9 +105,8 @@ Horário de funcionamento:
 - Nunca invente horários
 
 Orçamento:
-- Valor mínimo da tatuagem: R$150
-- Sessão de aproximadamente 3 horas: R$650
-- Sessão de aproximadamente 6 horas: R$1.200
+${tattooPriceLines().map((line) => `- ${line}`).join("\n")}
+- Esses valores são somente de TATUAGEM (nunca use para piercing).
 - Esses valores são referência — o valor final depende de tamanho, local do corpo, nível de detalhe, estilo, se é cobertura ou pele limpa, cor ou preto e cinza, e complexidade geral
 - Antes de estimar qualquer valor, procure descobrir: tamanho aproximado, local do corpo, referência e estilo desejado
 - Se faltar alguma dessas informações, pergunte antes de estimar
@@ -82,7 +114,7 @@ Orçamento:
 
 Agendamento:
 - Toda tatuagem precisa de agendamento
-- Reservar uma data exige sinal de R$100
+- Reservar uma data de tatuagem exige sinal de ${formatBRL(STUDIO_CATALOG.tattoo.deposit.amount)}
 - O sinal garante o horário e é abatido do valor final da tattoo
 - Você NÃO tem autorização para confirmar horários sozinho — toda confirmação oficial passa pelo Coringa
 - Se o cliente quiser agendar, colete todas as informações e encaminhe para confirmação final
@@ -170,7 +202,7 @@ Objetivo do agente:
 - nunca substituir o Coringa em decisões importantes
 - toda resposta deve transmitir confiança, profissionalismo, experiência e organização`;
 
-  const pilotContext = buildPilotPromptContext(decisionContext);
+  const pilotContext = buildPilotPromptContext(decisionContext) + buildAttendancePromptContext(attendanceState);
 
   if (!imageMode) {
     return `${base}

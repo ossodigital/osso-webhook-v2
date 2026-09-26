@@ -1,10 +1,14 @@
+import { STUDIO_CATALOG } from "../../config/business/catalog.js";
+
 export const PRICING_STATUS = Object.freeze({ INSUFFICIENT_DATA: "INSUFFICIENT_DATA", ESTIMATE_AVAILABLE: "ESTIMATE_AVAILABLE", HUMAN_REVIEW_REQUIRED: "HUMAN_REVIEW_REQUIRED" });
 
 export const OFFICIAL_PRICING = Object.freeze({
-  currency: "BRL",
-  minimum: Object.freeze({ amount: 150 }),
-  sessions: Object.freeze({ 3: Object.freeze({ hours: 3, amount: 650 }), 6: Object.freeze({ hours: 6, amount: 1200 }) }),
-  deposit: Object.freeze({ amount: 100 })
+  currency: STUDIO_CATALOG.currency,
+  minimum: Object.freeze({ amount: STUDIO_CATALOG.tattoo.minimum }),
+  sessions: Object.freeze(Object.fromEntries(Object.entries(STUDIO_CATALOG.tattoo.sessions).map(([hours, amount]) =>
+    [hours, Object.freeze({ hours: Number(hours), amount })]
+  ))),
+  deposit: Object.freeze({ amount: STUDIO_CATALOG.tattoo.deposit.amount })
 });
 
 const fact = (state, key) => state?.facts?.[key]?.value;

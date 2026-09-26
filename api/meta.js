@@ -23,7 +23,12 @@ import {
   getAdminPhones,
   testarAdminAlerts
 } from "../services/meta/adminAlerts.js";
-import { enviarWhatsApp, enviarWhatsAppAudio, uploadWhatsAppMedia } from "../services/meta/whatsapp.js";
+import {
+  WHATSAPP_PROVIDER_CAPABILITIES,
+  enviarWhatsApp,
+  enviarWhatsAppAudio,
+  uploadWhatsAppMedia
+} from "../services/meta/whatsapp.js";
 import {
   atualizarLeadPorTelefone,
   buscarLeadPorTelefone,
@@ -34,10 +39,27 @@ import {
 import { parseLeadsListParams } from "../services/supabase/leadsQueryParams.js";
 import {
   buscarMensagensMaisRecentesQue,
+  buscarMensagensParaEstado,
+  buscarUltimaMensagemAssistente,
   inserirMensagem,
   listarMensagensPorTelefone,
   listarMensagensRecentes
 } from "../services/supabase/messagesRepository.js";
+import { deriveAttendanceState } from "../modules/attendance/attendanceState.js";
+import {
+  ATTENDANCE_ACTION,
+  buildHandoffReply,
+  decideAttendanceTurn,
+  guardAttendanceReply
+} from "../modules/attendance/attendancePolicy.js";
+import { buildOperationalSummary } from "../modules/attendance/operationalSummary.js";
+import { executarHandoffAtendimento } from "../services/attendance/attendanceHandoffService.js";
+import { validateManualMessage } from "../services/attendance/manualMessagePolicy.js";
+
+// Janela de histórico textual enviada ao LLM. O assunto/estado da conversa
+// não depende dela: vem de deriveAttendanceState sobre ATTENDANCE_STATE_WINDOW.
+const LLM_HISTORY_WINDOW = 12;
+const ATTENDANCE_STATE_WINDOW = 80;
 import { uploadAudioLead, uploadImagemLead } from "../services/supabase/storage.js";
 import { buscarHandoffAtivo, listarHandoffsAtivosPorTelefones } from "../services/supabase/handoffRepository.js";
 import {
@@ -192,6 +214,36 @@ export default async function handler(req, res) {
           return res.status(500).json({ ok: false, error: error.message });
         }
         return res.status(200).json({ ok: true, phone, data });
+      }
+
+      if (req.query.debug === "lead-state") {
+        if (!validarDashboardToken(req)) {
+          return res.status(403).json({ ok: false, error: "Acesso negado" });
+        }
+        const phone = String(req.query.phone || "").trim();
+        if (!phone) {
+          return res.status(400).json({ ok: false, error: "Telefone ausente" });
+        }
+        const [{ data: lead }, { data: stateMessages, error: stateError }, { data: handoff }] = await Promise.all([
+          buscarLeadPorTelefone(phone),
+          buscarMensagensParaEstado(phone, ATTENDANCE_STATE_WINDOW),
+          buscarHandoffAtivo(phone)
+        ]);
+        if (stateError) return res.status(500).json({ ok: false, error: stateError.message });
+        const owner = evaluateHandoffRuntime({ status: handoff?.status }).owner;
+        const state = deriveAttendanceState(stateMessages || [], {
+          humanHandoff: lead?.stage === "humano" || owner !== "AI"
+        });
+        const { current, ...persistentState } = state;
+        return res.status(200).json({
+          ok: true,
+          phone,
+          state: persistentState,
+          summary: buildOperationalSummary(state),
+          handoffStatus: handoff?.status || HANDOFF_STATUS.NONE,
+          handoffReason: handoff?.reason || null,
+          capabilities: WHATSAPP_PROVIDER_CAPABILITIES
+        });
       }
 
       if (req.query.debug === "stats") {
@@ -440,10 +492,21 @@ export default async function handler(req, res) {
 
       // send-message
       if (dashboardAction === "send-message") {
-        const message = String(dashboardBody?.message || "").trim();
-        if (!message) {
-          return res.status(400).json({ ok: false, error: "Mensagem ausente" });
+        const { data: lastAssistant } = await buscarUltimaMensagemAssistente(phone);
+        const validation = validateManualMessage({
+          message: dashboardBody?.message,
+          confirmShort: dashboardBody?.confirmShort === true,
+          allowDuplicate: dashboardBody?.allowDuplicate === true,
+          lastAssistant
+        });
+        if (!validation.ok) {
+          return res.status(validation.status).json({ ok: false, error: validation.error, code: validation.code || null });
         }
+        if (validation.duplicate) {
+          console.log("DASHBOARD SEND-MESSAGE DUPLICATE IGNORED:", phone.slice(-4));
+          return res.status(200).json({ ok: true, duplicate: true });
+        }
+        const message = validation.text;
 
         const whatsappResult = await enviarWhatsApp(phone, message);
         if (!whatsappResult.ok) {
@@ -929,8 +992,65 @@ export default async function handler(req, res) {
       return res.status(200).send("ok");
     }
 
-    const { historyError, conversationHistory } = await carregarHistoricoConversa(phone, 4);
+    const { historyError, conversationHistory } = await carregarHistoricoConversa(phone, LLM_HISTORY_WINDOW);
     if (historyError) console.error("SUPABASE HISTORY ERROR:", historyError);
+
+    // Estado estruturado do atendimento (serviço, procedimento, data, preço,
+    // disponibilidade, promessas pendentes). Falha aqui nunca derruba o webhook:
+    // sem estado, o fluxo segue exatamente como antes.
+    let attendanceState = null;
+    try {
+      const { data: stateMessages, error: stateError } = await buscarMensagensParaEstado(phone, ATTENDANCE_STATE_WINDOW);
+      if (stateError) throw stateError;
+      attendanceState = deriveAttendanceState(stateMessages || []);
+    } catch (err) {
+      console.error("ATTENDANCE STATE ERROR:", err?.message || err?.name || "AttendanceStateError");
+    }
+
+    const legacyHumanStage = !pilotEnabled && stage === "humano";
+    const attendanceDecision = legacyHumanStage
+      ? { action: ATTENDANCE_ACTION.LLM }
+      : decideAttendanceTurn(attendanceState);
+
+    if (attendanceDecision.action !== ATTENDANCE_ACTION.LLM) {
+      let directReply = attendanceDecision.reply;
+      let directStage = stage;
+      let handoffResult = null;
+      if (attendanceDecision.action === ATTENDANCE_ACTION.HANDOFF) {
+        handoffResult = await executarHandoffAtendimento({
+          phone,
+          leadName,
+          pilotEnabled,
+          state: attendanceState,
+          reason: attendanceDecision.reason,
+          commercialStage: stage,
+          escalationMinutes: process.env.CORINGA_HANDOFF_ESCALATION_MINUTES
+        });
+        directReply = buildHandoffReply({ state: attendanceState, reason: attendanceDecision.reason, handoffOk: handoffResult.ok });
+        if (handoffResult.stage) directStage = handoffResult.stage;
+      }
+
+      console.log("ATTENDANCE DETERMINISTIC TURN", {
+        lead: phone.slice(-4),
+        action: attendanceDecision.action,
+        reason: attendanceDecision.reason || null,
+        service: attendanceState?.service_type,
+        pendingAction: attendanceState?.pending_action,
+        handoffOk: handoffResult?.ok ?? null
+      });
+
+      const directPayload = { name: leadName, stage: directStage, updated_at: new Date().toISOString(), last_message: userText };
+      if (existingLead && ["followup_1", "followup_2", "encerrado"].includes(existingLead.stage)) {
+        directPayload.followup_count = 0;
+        directPayload.last_followup_at = null;
+      }
+      const { error: directLeadError } = await atualizarLeadPorTelefone(phone, directPayload);
+      if (directLeadError) console.error("SUPABASE UPDATE LEAD ERROR:", directLeadError);
+
+      await inserirMensagem({ phone, role: "assistant", content: directReply });
+      await enviarWhatsApp(phone, directReply);
+      return res.status(200).send("ok");
+    }
 
     let decisionContext = pilotEnabled
       ? tryBuildPilotDecisionContext({
@@ -960,7 +1080,8 @@ export default async function handler(req, res) {
       conversationHistory,
       userContent,
       imageMode: mediaType === "image",
-      decisionContext
+      decisionContext,
+      attendanceState
     });
     reply = sanitizarRespostaLinks(reply);
     if (pilotEnabled) {
@@ -979,6 +1100,34 @@ export default async function handler(req, res) {
         candidateStage: effectiveStage,
         schedulingIntent: /\b(agendar|agenda|hor[aá]rio|data|dia)\b/iu.test(userText)
       });
+    }
+
+    // Nenhuma resposta pode prometer ação externa sem ação real correspondente.
+    // Ação real neste turno: stage "humano" legado (alerta ao admin logo abaixo)
+    // ou handoff do piloto já registrado.
+    let attendanceHandoffDone = false;
+    const replyActionBacked = (!pilotEnabled && newStage === "humano")
+      || Boolean(decisionContext?.handoff && decisionContext.handoff.status !== HANDOFF_STATUS.NONE);
+    const guardedReply = guardAttendanceReply({ reply, state: attendanceState, actionBacked: replyActionBacked });
+    if (guardedReply.rewritten) {
+      console.log("ATTENDANCE REPLY GUARD", { lead: phone.slice(-4), rewritten: guardedReply.rewritten });
+    }
+    reply = guardedReply.reply;
+    if (guardedReply.needsHandoff) {
+      const handoffResult = await executarHandoffAtendimento({
+        phone,
+        leadName,
+        pilotEnabled,
+        state: attendanceState,
+        reason: guardedReply.reason,
+        commercialStage: stage,
+        escalationMinutes: process.env.CORINGA_HANDOFF_ESCALATION_MINUTES
+      });
+      attendanceHandoffDone = handoffResult.ok;
+      if (handoffResult.stage) effectiveStage = handoffResult.stage;
+      reply = [reply, buildHandoffReply({ state: attendanceState, reason: guardedReply.reason, handoffOk: handoffResult.ok })]
+        .filter(Boolean)
+        .join("\n\n");
     }
 
     if (!pilotEnabled) {
@@ -1004,7 +1153,7 @@ export default async function handler(req, res) {
       console.error("SUPABASE UPDATE LEAD ERROR:", updateLeadError);
     }
 
-    if (!pilotEnabled && effectiveStage === "humano" && existingLead?.stage !== "humano") {
+    if (!pilotEnabled && !attendanceHandoffDone && effectiveStage === "humano" && existingLead?.stage !== "humano") {
       const adminResults = await alertarAdminLeadHumano({ leadName, phone, userText, stage: effectiveStage });
       const adminErrors = (adminResults || []).filter((r) => !r.ok);
       if (adminErrors.length) {

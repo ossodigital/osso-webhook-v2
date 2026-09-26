@@ -237,8 +237,8 @@
 
     .chat-input-area textarea {
       width: 100%;
-      height: 80px;
-      resize: none;
+      height: 120px;
+      resize: vertical;
       border: 1px solid #333;
       border-radius: 12px;
       background: #1a1a1a;
@@ -280,6 +280,119 @@
     .btn-ai {
       background: #00bfff;
       color: #000;
+    }
+
+    .chat-buttons button:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+
+    .composer-review {
+      display: none;
+      border: 1px solid #00ff88;
+      border-radius: 12px;
+      background: #0d1a13;
+      padding: 12px;
+      gap: 10px;
+    }
+
+    .composer-review.open {
+      display: grid;
+    }
+
+    .composer-review-label {
+      font-size: 12px;
+      color: #8fd9b3;
+      font-weight: bold;
+      letter-spacing: .04em;
+    }
+
+    .composer-review-text {
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #fff;
+      font-size: 15px;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    .composer-review-warning {
+      color: #ffcc66;
+      font-size: 13px;
+    }
+
+    .composer-review-actions {
+      display: grid;
+      grid-template-columns: 1fr 1.5fr;
+      gap: 10px;
+    }
+
+    .composer-review-actions button {
+      padding: 12px;
+      border: none;
+      border-radius: 12px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .btn-edit {
+      background: #333;
+      color: #fff;
+    }
+
+    .composer-hint {
+      font-size: 12px;
+      color: #888;
+    }
+
+    .handoff-panel {
+      display: none;
+      padding: 12px 20px;
+      background: #1f1405;
+      color: #ffd9a0;
+      border-bottom: 1px solid #5a3a0a;
+      font-size: 14px;
+      flex-shrink: 0;
+      max-height: 40vh;
+      overflow-y: auto;
+    }
+
+    .handoff-panel.open {
+      display: block;
+    }
+
+    .handoff-panel-title {
+      font-weight: bold;
+      color: #ffb347;
+      margin-bottom: 6px;
+    }
+
+    .handoff-panel-reason {
+      color: #fff;
+      margin-bottom: 8px;
+    }
+
+    .handoff-panel-grid {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 2px 12px;
+      font-size: 13px;
+    }
+
+    .handoff-panel-grid dt {
+      color: #c9a36b;
+      font-weight: bold;
+    }
+
+    .handoff-panel-grid dd {
+      margin: 0;
+      color: #fff;
+    }
+
+    .handoff-panel-price {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #fff;
     }
 
     .filters {
@@ -981,7 +1094,7 @@
       }
 
       .chat-input-area textarea {
-        height: 58px;
+        height: 96px;
       }
 
       h1 {
@@ -1426,6 +1539,8 @@
       🚨 ATENDIMENTO HUMANO ATIVO — IA BLOQUEADA PARA ESTE LEAD
     </div>
 
+    <div id="handoffPanel" class="handoff-panel" aria-live="polite"></div>
+
     <div id="chatMessages" class="chat-messages">
 
       <div class="empty">
@@ -1438,17 +1553,33 @@
 
       <textarea
         id="msgInput"
-        placeholder="Digite uma mensagem manual para o lead..."
+        enterkeyhint="enter"
+        placeholder="Escreva a mensagem completa. Enter quebra linha; nada é enviado sem revisar."
       ></textarea>
+
+      <div id="composerReview" class="composer-review" aria-live="polite">
+        <div class="composer-review-label">REVISE ANTES DE ENVIAR — é exatamente isto que o cliente vai receber:</div>
+        <div id="composerReviewText" class="composer-review-text"></div>
+        <div id="composerReviewWarning" class="composer-review-warning"></div>
+        <div class="composer-review-actions">
+          <button type="button" id="btnEditDraft" class="btn-edit" onclick="editarRascunho()">✏️ Editar</button>
+          <button type="button" id="btnConfirmSend" class="btn-send" onclick="enviarMensagemManual()">📤 Enviar</button>
+        </div>
+      </div>
+
+      <div class="composer-hint">
+        Mensagem enviada não pode ser apagada: a API oficial do WhatsApp (Meta Cloud API) não oferece "apagar para todos".
+      </div>
 
       <div class="chat-buttons">
 
         <button
           id="btnSend"
           class="btn-send"
-          onclick="enviarMensagemManual()"
+          type="button"
+          onclick="revisarMensagemManual()"
         >
-          📤 Enviar mensagem
+          👁️ Revisar
         </button>
 
         <button
@@ -1651,6 +1782,10 @@
   import { mergeLeadsPage, atualizarPrimeiraPagina } from "/dashboard/leadsPagination.js";
   window.mergeLeadsPage = mergeLeadsPage;
   window.atualizarPrimeiraPagina = atualizarPrimeiraPagina;
+</script>
+<script type="module">
+  import { criarComposer } from "/dashboard/composerGuard.js";
+  window.criarComposer = criarComposer;
 </script>
 <script>
 
@@ -2075,7 +2210,55 @@ function atualizarHeaderLead(lead) {
       : "none";
 }
 
+const handoffPanel =
+  document.getElementById("handoffPanel");
+
+let leadStateRequestId = 0;
+
+function renderHandoffPanel(payload) {
+  const summary = payload?.summary;
+  if (!summary || !summary.needsHuman) {
+    handoffPanel.classList.remove("open");
+    handoffPanel.innerHTML = "";
+    return;
+  }
+  const campos = (summary.fields || [])
+    .map(f => `<dt>${escaparHTML(f.label)}</dt><dd>${escaparHTML(f.value)}</dd>`)
+    .join("");
+  const precos = (summary.commercialContext || []).length
+    ? `<div class="handoff-panel-price"><strong>Contexto comercial:</strong> ${summary.commercialContext.map(escaparHTML).join(" · ")}</div>`
+    : "";
+  handoffPanel.innerHTML =
+    `<div class="handoff-panel-title">🧑‍💼 ${escaparHTML(summary.headline)}</div>` +
+    (summary.reason ? `<div class="handoff-panel-reason"><strong>Motivo:</strong> ${escaparHTML(summary.reason)}</div>` : "") +
+    `<dl class="handoff-panel-grid">${campos}</dl>` +
+    precos;
+  handoffPanel.classList.add("open");
+}
+
+async function carregarEstadoLead(phone) {
+  const requestId = ++leadStateRequestId;
+  try {
+    const res = await window.ossoAuth.authorizedFetch(
+      API + "?debug=lead-state&phone=" + encodeURIComponent(phone)
+    );
+    const data = await res.json();
+    if (requestId !== leadStateRequestId || phone !== selectedPhone) return;
+    if (!res.ok || !data.ok) {
+      renderHandoffPanel(null);
+      return;
+    }
+    renderHandoffPanel(data);
+  } catch (err) {
+    console.error("ERRO ESTADO LEAD:", err);
+  }
+}
+
 async function selecionarLead(phone) {
+
+  if (phone !== selectedPhone) fecharRevisao();
+
+  renderHandoffPanel(null);
 
   selectedPhone = phone;
 
@@ -2139,6 +2322,10 @@ async function carregarConversa(phone, forceScroll = false) {
     forceScroll ||
     mensagens.length !== lastMessageCount;
 
+  if (mensagens.length !== lastMessageCount) {
+    carregarEstadoLead(phone);
+  }
+
   lastMessageCount =
     mensagens.length;
 
@@ -2190,59 +2377,120 @@ async function carregarConversa(phone, forceScroll = false) {
   }
 }
 
-async function enviarMensagemManual() {
+// ─── Composer seguro: digitar → revisar → enviar ─────────────────────────
+// Regras em /dashboard/composerGuard.js (testadas em tests/dashboard).
+const composerReview = document.getElementById("composerReview");
+const composerReviewText = document.getElementById("composerReviewText");
+const composerReviewWarning = document.getElementById("composerReviewWarning");
+const btnConfirmSend = document.getElementById("btnConfirmSend");
+const btnEditDraft = document.getElementById("btnEditDraft");
+
+let composerInstance = null;
+let composerReviewPhone = null;
+
+function composer() {
+  if (!composerInstance) {
+    composerInstance = window.criarComposer({
+      enviar: postarMensagemManual,
+      confirmar: (pergunta) => window.confirm(pergunta)
+    });
+  }
+  return composerInstance;
+}
+
+function fecharRevisao() {
+  composerReview.classList.remove("open");
+  composerReviewPhone = null;
+  if (composerInstance) composerInstance.invalidarRevisao();
+}
+
+function editarRascunho() {
+  fecharRevisao();
+  msgInput.focus();
+}
+
+function revisarMensagemManual() {
 
   if (!selectedPhone) {
-
     alert("Selecione um lead primeiro.");
-
     return;
   }
 
-  const mensagem =
-    msgInput.value.trim();
+  if (!window.criarComposer) {
+    alert("Dashboard ainda carregando. Tente de novo em instantes.");
+    return;
+  }
 
-  if (!mensagem) {
+  const revisao = composer().revisar(msgInput.value);
 
+  if (!revisao.ok) {
     alert("Digite uma mensagem.");
-
     return;
   }
 
-  btnSend.disabled = true;
+  composerReviewPhone = selectedPhone;
+  composerReviewText.textContent = revisao.texto;
+  const lead = leadsCache.find(l => l.phone === selectedPhone);
+  const destino = lead ? `${lead.name || "Sem nome"} (${lead.phone})` : selectedPhone;
+  composerReviewWarning.textContent =
+    (revisao.curto ? `⚠️ Mensagem muito curta (${revisao.texto.length} caractere(s)). Confirme se não foi acidental. ` : "")
+    + `Para: ${destino}`;
+  composerReview.classList.add("open");
+  btnConfirmSend.focus();
+}
 
-  btnSend.textContent =
-    "Enviando...";
+async function postarMensagemManual(mensagem, { confirmShort, allowDuplicate }) {
+  const res = await window.ossoAuth.authorizedFetch(
+    API + "?debug=send-message",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        phone: composerReviewPhone,
+        message: mensagem,
+        confirmShort,
+        allowDuplicate
+      })
+    }
+  );
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok && data.ok, data };
+}
+
+async function enviarMensagemManual() {
+
+  if (!selectedPhone || composerReviewPhone !== selectedPhone) {
+    alert("Revise a mensagem deste lead antes de enviar.");
+    fecharRevisao();
+    return;
+  }
+
+  if (composer().enviando) return;
+
+  btnConfirmSend.disabled = true;
+  btnEditDraft.disabled = true;
+  btnSend.disabled = true;
+  btnConfirmSend.textContent = "Enviando...";
 
   try {
 
-    const res = await window.ossoAuth.authorizedFetch(
-      API + "?debug=send-message",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          phone: selectedPhone,
-          message: mensagem
-        })
+    const resultado = await composer().enviar(msgInput.value);
+
+    if (!resultado.ok) {
+      if (resultado.motivo === "revisar") {
+        alert("A mensagem mudou depois da revisão. Revise de novo.");
+        fecharRevisao();
+      } else if (resultado.data) {
+        alert(resultado.data.error || "Erro ao enviar mensagem.");
+        console.error(resultado.data);
       }
-    );
-
-    const data =
-      await res.json();
-
-    if (!res.ok || !data.ok) {
-
-      alert("Erro ao enviar mensagem.");
-
-      console.error(data);
-
       return;
     }
 
     msgInput.value = "";
+    fecharRevisao();
 
     await carregarLeads();
 
@@ -2250,6 +2498,8 @@ async function enviarMensagemManual() {
       selectedPhone,
       true
     );
+
+    carregarEstadoLead(selectedPhone);
 
   } catch (err) {
 
@@ -2259,10 +2509,10 @@ async function enviarMensagemManual() {
 
   } finally {
 
+    btnConfirmSend.disabled = false;
+    btnEditDraft.disabled = false;
     btnSend.disabled = false;
-
-    btnSend.textContent =
-      "📤 Enviar mensagem";
+    btnConfirmSend.textContent = "📤 Enviar";
   }
 }
 
@@ -2313,6 +2563,8 @@ async function ativarHumano() {
       selectedPhone,
       true
     );
+
+    carregarEstadoLead(selectedPhone);
 
   } catch (err) {
 
@@ -2384,6 +2636,8 @@ async function voltarIA() {
       true
     );
 
+    carregarEstadoLead(selectedPhone);
+
   } catch (err) {
 
     console.error(err);
@@ -2399,20 +2653,13 @@ async function voltarIA() {
   }
 }
 
+// Enter NÃO envia (evita mensagens picadas): o textarea quebra linha
+// normalmente. Envio só pelos botões Revisar → Enviar. Qualquer edição
+// depois da revisão invalida a revisão.
 msgInput.addEventListener(
-  "keydown",
-  function(event) {
-
-    if (
-      event.key === "Enter"
-      &&
-      !event.shiftKey
-    ) {
-
-      event.preventDefault();
-
-      enviarMensagemManual();
-    }
+  "input",
+  function() {
+    if (composerReview.classList.contains("open")) fecharRevisao();
   }
 );
 

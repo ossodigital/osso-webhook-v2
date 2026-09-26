@@ -9,6 +9,7 @@ export async function gerarRespostaAtendimento({
   userContent,
   imageMode = false,
   decisionContext = null,
+  attendanceState = null,
   fallbackReply = "Me conta melhor sua ideia 👊"
 }) {
   let reply = fallbackReply;
@@ -29,7 +30,7 @@ export async function gerarRespostaAtendimento({
           messages: [
             {
               role: "system",
-              content: montarPromptSistema(leadName, { imageMode, decisionContext })
+              content: montarPromptSistema(leadName, { imageMode, decisionContext, attendanceState })
             },
             ...conversationHistory,
             {
